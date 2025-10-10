@@ -1,135 +1,121 @@
 # 🎵 Multi-Room Player for Bluesound and Sonos Devices
 
-A Multi-Room preset player for the command line with multi-language support and automatic network scanning.
+A Multi-Room preset player for the command line with **interactive and non-interactive modes**, multi-language support, and automatic network scanning.
 
 ## ✨ Features
 
-- 🔍 **Automatic Network Scanning** - Finds all BlueSound players on your network
+- 🔍 **Automatic Network Scanning** - Finds all BluOS and Sonos players on your network
 - 🌍 **Multi-Language Support** - English, German, and Swahili
-- 🎮 **Interactive Control** - Simple command-line interface
-- 📱 **Multiple Player Support** - Choose from detected players
+- 🎮 **Two Control Modes** - Interactive TUI and CLI command mode
+- 📱 **Multiple Player Support** - Control different players easily
 - 🎵 **Full Playback Control** - Play, pause, stop, volume, and preset management
+- 🔗 **Player Grouping** - Group BluOS players for synchronized playback
 
 ## 📦 Installation
 
 1. **Clone this repository:**
    ```bash
    git clone <repository-url>
-   cd bluesoundplayer/src
+   cd bluesoundplayer
    ```
 
 2. **Build the application:**
    ```bash
-   go build -o bluesoundplyer *.go
+   # Build for your current platform
+   cd src && go build -o ../bluesoundplayer *.go
+   
+   # Or use the Makefile for multiple platforms
+   make all
    ```
 
 ## 🚀 Usage
 
-1. **Start the application:**
-   ```bash
-   ./bluesoundplayer
-   ```
+### Interactive Mode (TUI)
 
-2. **Select a player:**  
-   The app will automatically scan your network and show available players:
-   ```
-   📱 Available Players:
-     [1] Living Room Speaker (Bluesound Node) - 192.168.1.100 [BlueSound]
-     [2] Kitchen Speaker (Bluesound Pulse) - 192.168.1.101 [BlueSound]
-     [3] Sonos Play:3 (Sonos Sonos Play:3) - 192.168.1.102 [Sonos]
-   
-   Select a player (1-3): 1
-   ```
+Start the application without flags to enter interactive mode:
 
-3. **Use interactive commands:**  
-   Once connected, you can control your player with simple commands.
-
-## 🎮 Available Commands
-
-| Command | Description |
-|---------|-------------|
-| `play <preset_id>` | Play a specific preset |
-| `play` | Start/resume playback |
-| `pause` | Pause playback |
-| `stop` | Stop playback |
-| `next` | Skip to next track |
-| `prev` | Go to previous track |
-| `volume <0-100>` | Set volume level |
-| `vol <0-100>` | Set volume (short command) |
-| `status` | Show current player status |
-| `presets` | List all available presets |
-| `help` | Show command help |
-| `lang <en\|de\|sw>` | Change interface language |
-| `quit` / `exit` | Exit the application |
-
-## 🌍 Language Support
-
-Switch between languages anytime during operation:
-
-| Command | Language | Example Output |
-|---------|----------|----------------|
-| `lang en` | 🇺🇸 English | "✅ Connected to: Living Room Speaker" |
-| `lang de` | 🇩🇪 Deutsch | "✅ Verbunden mit: Wohnzimmer Lautsprecher" |
-| `lang sw` | 🇹🇿 Kiswahili | "✅ Imeunganishwa na: Kichezaji cha Sebuleni" |
-
-## 📝 Example Session
-
-```
-🎵 Multi-Room Audio Controller
-===========================================================
-🔍 Scanning network for BlueSound players...
-   Scanning network: 192.168.1
-   ✅ Found: Living Room (Node 2i) at 192.168.1.100
-
-📱 Available Players:
-  [1] Living Room (Bluesound Node 2i) - 192.168.1.100
-
-Select a player (1-1): 1
-✅ Connected to: Living Room (192.168.1.100)
-
-🎵 Multi-Room Audio Controller - Interactive Mode
-===========================================================
-
-📊 Status: stop | Volume: 50%
-
-📋 Available Presets:
-  [1] Spotify Daily Mix
-  [2] Radio Paradise
-  [3] Classical WQXR
-
-🎮 Available Commands:
-  play <preset_id>  - Play preset
-  play              - Start playback
-  ...
-
-Command> play 1
-✅ Playing preset 1
-
-📊 Status: stream | Volume: 50%
-🎵 Great Song - Amazing Artist (Awesome Album)
-
-Command> lang de
-🌍 Sprache geändert zu Deutsch
-
-Command> help
-🎮 Verfügbare Befehle:
-  play <preset_id>  - Preset abspielen
-  ...
-
-Command> quit
-👋 Auf Wiedersehen!
+```bash
+./bluesoundplayer
 ```
 
-## 🔧 Requirements
+The app will:
+1. Scan your network for players
+2. Let you select a player
+3. Enter an interactive interface with real-time status updates
 
-- Go 1.19 or higher
-- BlueSound-compatible device on the same network
-- Network access to scan for devices
+### Non-Interactive Mode (CLI)
 
-## 🤝 Contributing
+Use the `-c` flag for single commands:
 
-Feel free to submit issues, feature requests, or pull requests to improve this tool!
+```bash
+# List all available players
+./bluesoundplayer -list
 
-## 📄 License
+# Show status of first player
+./bluesoundplayer -c -status
 
-This project is open source. Check the LICENSE file for details.
+# Play preset 3 on specific player
+./bluesoundplayer -c -ip 192.168.1.100 -preset 3
+
+# Set volume to 75%
+./bluesoundplayer -c -player 2 -volume 75
+
+# Control playback
+./bluesoundplayer -c -ip 192.168.1.100 -cmd play
+./bluesoundplayer -c -ip 192.168.1.100 -cmd pause
+./bluesoundplayer -c -ip 192.168.1.100 -cmd next
+```
+
+## 📋 Command Line Options
+
+### Player Selection
+- `-ip <address>` - Select player by IP address (e.g., 192.168.1.100)
+- `-player <N>` - Select player by index from scan (1-N)
+- `-type <bluos|sonos>` - Filter by device type
+
+### Commands
+- `-cmd play` - Start/resume playback
+- `-cmd pause` - Pause playback
+- `-cmd stop` - Stop playback
+- `-cmd next` - Skip to next track
+- `-cmd prev` - Go to previous track
+- `-cmd status` - Show player status
+- `-cmd presets` - List available presets/favorites
+
+### Direct Actions
+- `-preset <ID>` - Play preset/favorite by ID
+- `-volume <0-100>` - Set volume level
+- `-status` - Show player status (shortcut flag)
+- `-presets` - List presets (shortcut flag)
+- `-list` - List all players (shortcut flag)
+
+### Options
+- `-c` or `-command` - Enable non-interactive command mode
+- `-help` - Show help message
+
+## 💡 CLI Examples
+
+### Discovery and Information
+
+```bash
+# List all players on the network
+./bluesoundplayer -list
+
+# Show detailed status of first player
+./bluesoundplayer -c -status
+
+# List presets for specific player
+./bluesoundplayer -c -ip 192.168.1.100 -presets
+
+# Find only BluOS devices
+./bluesoundplayer -c -type bluos -list
+```
+
+### Playback Control
+
+```bash
+# Play preset 5 on first player
+./bluesoundplayer -c -preset 5
+
+# Play preset on specific player by IP
+./bluesoundplayer -

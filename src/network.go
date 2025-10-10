@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -95,8 +96,29 @@ func scanForPlayers() ([]PlayerInfo, error) {
 	}
 
 	wg.Wait()
+	
+	// Sort players by IP address for consistent ordering
+	sort.Slice(players, func(i, j int) bool {
+		return ipToInt(players[i].IP) < ipToInt(players[j].IP)
+	})
+	
 	fmt.Printf(getText("completed_scan")+"\n", len(interfaces))
 	return players, nil
+}
+
+// Convert IP address to integer for sorting
+func ipToInt(ip string) uint32 {
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		return 0
+	}
+	var result uint32
+	for i := 0; i < 4; i++ {
+		var octet uint32
+		fmt.Sscanf(parts[i], "%d", &octet)
+		result = result<<8 | octet
+	}
+	return result
 }
 
 // Get all network interfaces with their subnets

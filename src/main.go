@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -118,9 +119,6 @@ func renderTUI() {
 			if tuiState.status.Artist != "" {
 				fmt.Printf(" - %s", tuiState.status.Artist)
 			}
-			//if tuiState.status.Album != "" {
-			//	fmt.Printf(" (%s)", tuiState.status.Album)
-			//}
 			fmt.Println()
 		} else {
 			fmt.Printf("🎵 %s\n", getText("no_song_playing"))
@@ -522,6 +520,20 @@ func interactiveMode() {
 }
 
 func main() {
+	// Initialize CLI flags
+	initCLIFlags()
+	flag.Parse()
+
+	// Handle non-interactive CLI mode
+	if cliFlags.nonInteractive || cliFlags.listPlayers || cliFlags.status || cliFlags.listPresets || cliFlags.help {
+		if err := handleCLIMode(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Interactive mode (original behavior)
 	fmt.Println(getText("title"))
 	fmt.Println(strings.Repeat("=", 70))
 

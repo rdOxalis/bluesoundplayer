@@ -1,0 +1,4 @@
+Build date: Fr 10. Okt 19:31:32 CEST 2025
+Git commit: 7ee1955
+
+Platforms built:
