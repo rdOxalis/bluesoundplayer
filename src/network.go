@@ -19,6 +19,22 @@ const (
 	ScanTimeout   = 3 * time.Second
 )
 
+// Global variable for quiet mode
+var quietMode = true
+
+// Helper function for scan output
+func scanPrint(format string, args ...interface{}) {
+	if !quietMode {
+		fmt.Printf(format, args...)
+	}
+}
+
+func scanPrintln(args ...interface{}) {
+	if !quietMode {
+		fmt.Println(args...)
+	}
+}
+
 // Network interface info
 type NetworkInterface struct {
 	Name   string
@@ -28,7 +44,7 @@ type NetworkInterface struct {
 
 // Enhanced network scanner that scans all available interfaces
 func scanForPlayers() ([]PlayerInfo, error) {
-	fmt.Println(getText("scanning"))
+	scanPrintln(getText("scanning"))
 
 	// Get all network interfaces
 	interfaces, err := getAllNetworkInterfaces()
@@ -40,7 +56,7 @@ func scanForPlayers() ([]PlayerInfo, error) {
 		return nil, fmt.Errorf("no network interfaces found")
 	}
 
-	fmt.Printf(getText("scanning_interfaces")+"\n", len(interfaces))
+	scanPrint(getText("scanning_interfaces")+"\n", len(interfaces))
 
 	var players []PlayerInfo
 	var mu sync.Mutex
@@ -48,7 +64,7 @@ func scanForPlayers() ([]PlayerInfo, error) {
 
 	// Scan each network interface
 	for _, iface := range interfaces {
-		fmt.Printf(getText("scanning_interface")+"\n", iface.Name, iface.Subnet)
+		scanPrint(getText("scanning_interface")+"\n", iface.Name, iface.Subnet)
 
 		// Scan all IPs in this subnet in parallel
 		for i := 1; i < 255; i++ {
@@ -69,7 +85,7 @@ func scanForPlayers() ([]PlayerInfo, error) {
 					}
 					if !exists {
 						players = append(players, player)
-						fmt.Printf(getText("found_player")+"\n", player.Name, player.Model, player.IP)
+						scanPrint(getText("found_player")+"\n", player.Name, player.Model, player.IP)
 					}
 					mu.Unlock()
 				}
@@ -87,7 +103,7 @@ func scanForPlayers() ([]PlayerInfo, error) {
 					}
 					if !exists {
 						players = append(players, player)
-						fmt.Printf(getText("found_player")+"\n", player.Name, player.Model, player.IP)
+						scanPrint(getText("found_player")+"\n", player.Name, player.Model, player.IP)
 					}
 					mu.Unlock()
 				}
@@ -102,7 +118,7 @@ func scanForPlayers() ([]PlayerInfo, error) {
 		return ipToInt(players[i].IP) < ipToInt(players[j].IP)
 	})
 	
-	fmt.Printf(getText("completed_scan")+"\n", len(interfaces))
+	scanPrint(getText("completed_scan")+"\n", len(interfaces))
 	return players, nil
 }
 

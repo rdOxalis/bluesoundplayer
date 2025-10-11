@@ -48,12 +48,7 @@ func handleCLIMode() error {
 		return nil
 	}
 
-	// List players and exit
-	if cliFlags.listPlayers {
-		return listPlayersCmd()
-	}
-
-	// Scan for players
+	// Scan for players (quiet mode is already true by default)
 	players, err := scanForPlayers()
 	if err != nil {
 		return fmt.Errorf("failed to scan for players: %w", err)
@@ -78,6 +73,11 @@ func handleCLIMode() error {
 		}
 	}
 
+	// List players and exit (after filtering!)
+	if cliFlags.listPlayers {
+		return displayPlayersList(players)
+	}
+
 	// Select player
 	var selectedPlayer PlayerInfo
 	if cliFlags.playerIP != "" {
@@ -99,7 +99,6 @@ func handleCLIMode() error {
 	} else {
 		// Use first player if no selection criteria given
 		selectedPlayer = players[0]
-		fmt.Printf("No player specified, using: %s (%s)\n", selectedPlayer.Name, selectedPlayer.IP)
 	}
 
 	// Create client
@@ -205,13 +204,23 @@ func executeCLICommand(client AudioClient, player *PlayerInfo) error {
 	}
 }
 
-// List all available players
+// List all available players (scans fresh)
 func listPlayersCmd() error {
 	players, err := scanForPlayers()
 	if err != nil {
 		return fmt.Errorf("failed to scan: %w", err)
 	}
 
+	if len(players) == 0 {
+		fmt.Println("No players found")
+		return nil
+	}
+
+	return displayPlayersList(players)
+}
+
+// Display a list of players
+func displayPlayersList(players []PlayerInfo) error {
 	if len(players) == 0 {
 		fmt.Println("No players found")
 		return nil
@@ -342,8 +351,11 @@ OPTIONS:
   -help             Show this help message
 
 EXAMPLES:
-  # List all players
+  # List all players (quiet scan)
   bluesoundplayer -list
+
+  # List only BluOS players
+  bluesoundplayer -c -type bluos -list
 
   # Show status of first player
   bluesoundplayer -c -status
@@ -357,14 +369,10 @@ EXAMPLES:
   # Pause playback on specific player
   bluesoundplayer -c -ip 192.168.1.100 -cmd pause
 
-  # Show presets for BluOS devices only
-  bluesoundplayer -c -type bluos -presets
-
-  # Next track on first Sonos player
-  bluesoundplayer -c -type sonos -cmd next
-
 INTERACTIVE MODE:
   Run without -c flag to enter interactive mode:
   bluesoundplayer
+  
+  Note: Interactive mode shows scan details
 `)
 }

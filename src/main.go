@@ -155,6 +155,9 @@ func renderTUI() {
 
 // Player selection
 func selectPlayer() (AudioClient, string, []PlayerInfo, error) {
+	// Enable verbose output for interactive mode
+	quietMode = false
+	
 	players, err := scanForPlayers()
 	if err != nil {
 		return nil, "", nil, err
@@ -523,6 +526,32 @@ func main() {
 	// Initialize CLI flags
 	initCLIFlags()
 	flag.Parse()
+
+	// Check if user provided CLI flags but forgot -c
+	if !cliFlags.nonInteractive && !cliFlags.listPlayers && !cliFlags.status && 
+		!cliFlags.listPresets && !cliFlags.help {
+		// Check if any command-line options were provided
+		hasOptions := cliFlags.playerIP != "" || 
+			cliFlags.playerIndex > 0 || 
+			cliFlags.command != "" || 
+			cliFlags.presetID > 0 || 
+			cliFlags.volume >= 0 || 
+			cliFlags.deviceType != ""
+		
+		if hasOptions {
+			fmt.Println("❌ Error: Command-line options provided without enabling CLI mode")
+			fmt.Println()
+			fmt.Println("To use non-interactive mode, add the -c flag:")
+			fmt.Println()
+			fmt.Println("Examples:")
+			fmt.Println("  ./bluesoundplayer -c -ip 192.168.1.100 -cmd play")
+			fmt.Println("  ./bluesoundplayer -c -player 1 -preset 3")
+			fmt.Println()
+			fmt.Println("For help, use: ./bluesoundplayer -help")
+			fmt.Println("For interactive mode, run without any flags: ./bluesoundplayer")
+			os.Exit(1)
+		}
+	}
 
 	// Handle non-interactive CLI mode
 	if cliFlags.nonInteractive || cliFlags.listPlayers || cliFlags.status || cliFlags.listPresets || cliFlags.help {
