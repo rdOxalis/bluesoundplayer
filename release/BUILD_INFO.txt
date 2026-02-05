@@ -1,0 +1,11 @@
+Build date: Do 5. Feb 17:30:10 CET 2026
+Git commit: 2c8ec4c
+
+Platforms built:
+  - bluesoundplayer-apple-amd64
+  - bluesoundplayer-apple-arm64
+  - bluesoundplayer-linux-amd64
+  - bluesoundplayer-linux-arm64
+  - bluesoundplayer-linux-armv6
+  - bluesoundplayer-linux-armv7
+  - bluesoundplayer-win-amd64.exe
