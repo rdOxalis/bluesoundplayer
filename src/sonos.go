@@ -275,24 +275,25 @@ func (sc *SonosClient) parseFavoritesFromResponse(xmlResponse string) []SonosFav
 	// Decode the DIDL-Lite content
 	didlContent := html.UnescapeString(resultMatch[1])
 
-	// Parse items from DIDL-Lite
-	itemRegex := regexp.MustCompile(`<item[^>]*id="([^"]*)"[^>]*>(.*?)</item>`)
+	// Parse items from DIDL-Lite - capture the full item element
+	// Use (?s) flag to make . match newlines
+	itemRegex := regexp.MustCompile(`(?s)(<item[^>]*>.*?</item>)`)
 	titleRegex := regexp.MustCompile(`<dc:title[^>]*>(.*?)</dc:title>`)
 	resRegex := regexp.MustCompile(`<res[^>]*>(.*?)</res>`)
 
 	items := itemRegex.FindAllStringSubmatch(didlContent, -1)
 
 	for i, item := range items {
-		if len(item) > 2 {
-			itemContent := item[2]
+		if len(item) > 1 {
+			fullItemXml := item[1]
 
 			var title, uri string
 
-			if titleMatch := titleRegex.FindStringSubmatch(itemContent); len(titleMatch) > 1 {
+			if titleMatch := titleRegex.FindStringSubmatch(fullItemXml); len(titleMatch) > 1 {
 				title = html.UnescapeString(titleMatch[1])
 			}
 
-			if resMatch := resRegex.FindStringSubmatch(itemContent); len(resMatch) > 1 {
+			if resMatch := resRegex.FindStringSubmatch(fullItemXml); len(resMatch) > 1 {
 				uri = html.UnescapeString(resMatch[1])
 			}
 
@@ -301,7 +302,7 @@ func (sc *SonosClient) parseFavoritesFromResponse(xmlResponse string) []SonosFav
 					ID:   i + 1,
 					Name: strings.TrimSpace(title),
 					URI:  uri,
-					Meta: itemContent,
+					Meta: fullItemXml, // Store full item XML for use in SetAVTransportURI
 				})
 			}
 		}
@@ -458,107 +459,33 @@ func (sc *SonosClient) PlayPreset(id int) error {
 		return fmt.Errorf("no URI available for this favorite")
 	}
 
-	// For Sonos favorites, we need to use the original metadata from the browse response
-	// The key is to preserve the exact metadata structure that Sonos expects
+	// Extract r:resMD from the item metadata if present - this contains the proper playback metadata
 	var metadata string
-	if favorite.Meta != "" {
-		// Use the original metadata wrapped in DIDL-Lite envelope
-		metadata = fmt.Sprintf(`&lt;DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"&gt;&lt;item id="FAVORITE"&gt;%s&lt;/item&gt;&lt;/DIDL-Lite&gt;`,
-			strings.ReplaceAll(strings.ReplaceAll(favorite.Meta, "<", "&lt;"), ">", "&gt;"))
+	resMDRegex := regexp.MustCompile(`<r:resMD>(.*?)</r:resMD>`)
+
+	if resMDMatch := resMDRegex.FindStringSubmatch(favorite.Meta); len(resMDMatch) > 1 {
+		// Use the resMD content directly - it's already escaped DIDL-Lite, just needs to stay escaped
+		metadata = resMDMatch[1]
+	} else if favorite.Meta != "" {
+		// No resMD found, wrap the item in DIDL-Lite
+		fullDidl := fmt.Sprintf(`<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">%s</DIDL-Lite>`, favorite.Meta)
+		metadata = escapeXmlForSoap(fullDidl)
 	} else {
-		// Create minimal valid metadata for radio stations
-		metadata = `&lt;DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"&gt;&lt;item id="R:0/0"&gt;&lt;dc:title&gt;` + html.EscapeString(favorite.Name) + `&lt;/dc:title&gt;&lt;upnp:class&gt;object.item.audioItem.audioBroadcast&lt;/upnp:class&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;`
+		// Fallback: minimal metadata with TuneIn service
+		fullDidl := fmt.Sprintf(`<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"><item id="R:0/0/0" parentID="R:0/0" restricted="true"><dc:title>%s</dc:title><upnp:class>object.item.audioItem.audioBroadcast</upnp:class><desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">SA_RINCON65031_</desc></item></DIDL-Lite>`, html.EscapeString(favorite.Name))
+		metadata = escapeXmlForSoap(fullDidl)
 	}
 
-	// Create SOAP request with proper XML escaping
+	// Use SetAVTransportURI with proper metadata for radio streams
 	body := fmt.Sprintf(`<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
 		<InstanceID>0</InstanceID>
 		<CurrentURI>%s</CurrentURI>
 		<CurrentURIMetaData>%s</CurrentURIMetaData>
 	</u:SetAVTransportURI>`, html.EscapeString(favorite.URI), metadata)
 
-	soapEnvelope := fmt.Sprintf(`<?xml version="1.0"?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-<s:Body>%s</s:Body>
-</s:Envelope>`, body)
-
-	url := fmt.Sprintf("%s/MediaRenderer/AVTransport/Control", sc.baseURL)
-	req, err := http.NewRequest("POST", url, strings.NewReader(soapEnvelope))
+	_, err := sc.makeSoapRequest("SetAVTransportURI", "AVTransport", body)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "text/xml; charset=utf-8")
-	req.Header.Set("SOAPAction", `"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI"`)
-	req.Header.Set("Content-Length", fmt.Sprintf("%d", len(soapEnvelope)))
-
-	resp, err := sc.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("SOAP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-
-		// Try alternative approach for radio streams
-		if strings.Contains(favorite.URI, "x-sonosapi") || strings.Contains(favorite.URI, "radio") {
-			return sc.playRadioStation(favorite)
-		}
-
-		return fmt.Errorf("SetAVTransportURI failed with status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	// Start playback
-	return sc.Play()
-}
-
-func (sc *SonosClient) playRadioStation(favorite *SonosFavorite) error {
-	// Clear the queue first
-	clearBody := `<u:RemoveAllTracksFromQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
-		<InstanceID>0</InstanceID>
-	</u:RemoveAllTracksFromQueue>`
-
-	_, err := sc.makeSoapRequest("RemoveAllTracksFromQueue", "AVTransport", clearBody)
-	if err != nil {
-		// Continue anyway
-	}
-
-	// Set the queue mode to play from queue
-	setPlayModeBody := `<u:SetPlayMode xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
-		<InstanceID>0</InstanceID>
-		<NewPlayMode>NORMAL</NewPlayMode>
-	</u:SetPlayMode>`
-
-	_, err = sc.makeSoapRequest("SetPlayMode", "AVTransport", setPlayModeBody)
-	if err != nil {
-		// Continue anyway
-	}
-
-	// Add the radio station to queue
-	addBody := fmt.Sprintf(`<u:AddURIToQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
-		<InstanceID>0</InstanceID>
-		<EnqueuedURI>%s</EnqueuedURI>
-		<EnqueuedURIMetaData>&lt;DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"&gt;&lt;item id="R:0/0"&gt;&lt;dc:title&gt;%s&lt;/dc:title&gt;&lt;upnp:class&gt;object.item.audioItem.audioBroadcast&lt;/upnp:class&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;</EnqueuedURIMetaData>
-		<DesiredFirstTrackNumberEnqueued>1</DesiredFirstTrackNumberEnqueued>
-		<EnqueueAsNext>0</EnqueueAsNext>
-	</u:AddURIToQueue>`, html.EscapeString(favorite.URI), html.EscapeString(favorite.Name))
-
-	_, err = sc.makeSoapRequest("AddURIToQueue", "AVTransport", addBody)
-	if err != nil {
-		return fmt.Errorf("failed to add radio to queue: %w", err)
-	}
-
-	// Seek to the first track in queue
-	seekBody := `<u:Seek xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
-		<InstanceID>0</InstanceID>
-		<Unit>TRACK_NR</Unit>
-		<Target>1</Target>
-	</u:Seek>`
-
-	_, err = sc.makeSoapRequest("Seek", "AVTransport", seekBody)
-	if err != nil {
-		// Continue anyway
+		return fmt.Errorf("SetAVTransportURI failed: %w", err)
 	}
 
 	// Start playback
@@ -645,6 +572,16 @@ func (sc *SonosClient) LeaveGroup() error {
 
 func (sc *SonosClient) GetDeviceType() DeviceType {
 	return DeviceTypeSonos
+}
+
+// escapeXmlForSoap escapes XML content for embedding in SOAP requests
+func escapeXmlForSoap(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&apos;")
+	return s
 }
 
 func (sc *SonosClient) DebugAPI() string {
