@@ -553,21 +553,170 @@ func (sc *SonosClient) Previous() error {
 	return err
 }
 
+// makeSoapRequestPath sends a SOAP request to an arbitrary path (not just /MediaRenderer/...)
+func (sc *SonosClient) makeSoapRequestPath(path, service, action, body string) ([]byte, error) {
+	soapEnvelope := fmt.Sprintf(`<?xml version="1.0"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+<s:Body>
+  <u:%s xmlns:u="urn:schemas-upnp-org:service:%s:1">
+    %s
+  </u:%s>
+</s:Body>
+</s:Envelope>`, action, service, body, action)
+
+	url := sc.baseURL + path
+	req, err := http.NewRequest("POST", url, strings.NewReader(soapEnvelope))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "text/xml; charset=utf-8")
+	req.Header.Set("SOAPAction", fmt.Sprintf(`"urn:schemas-upnp-org:service:%s:1#%s"`, service, action))
+
+	resp, err := sc.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("SOAP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("SOAP request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
 func (sc *SonosClient) AddSlave(slaveIP string) error {
-	// Sonos grouping is more complex - for now, return not implemented
-	return fmt.Errorf("Sonos grouping not yet implemented")
+	// Sonos grouping: we need the master's RINCON UUID.
+	// Look up the UUID from the available players list.
+	masterUUID := ""
+	masterIP := strings.TrimPrefix(sc.baseURL, "http://")
+	masterIP = strings.TrimSuffix(masterIP, ":"+SonosPort)
+
+	for _, player := range tuiState.availablePlayers {
+		if player.IP == masterIP && player.UUID != "" {
+			masterUUID = player.UUID
+			break
+		}
+	}
+
+	if masterUUID == "" {
+		return fmt.Errorf("cannot group: master RINCON UUID not found (IP: %s)", masterIP)
+	}
+
+	// Call SetAVTransportURI on the SLAVE with x-rincon:<master-UUID>
+	slaveClient := NewSonosClient(slaveIP)
+	body := fmt.Sprintf(`<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+		<InstanceID>0</InstanceID>
+		<CurrentURI>x-rincon:%s</CurrentURI>
+		<CurrentURIMetaData></CurrentURIMetaData>
+	</u:SetAVTransportURI>`, masterUUID)
+
+	_, err := slaveClient.makeSoapRequest("SetAVTransportURI", "AVTransport", body)
+	if err != nil {
+		return fmt.Errorf("failed to group Sonos speakers: %w", err)
+	}
+	return nil
 }
 
 func (sc *SonosClient) RemoveSlave(slaveIP string) error {
-	return fmt.Errorf("Sonos grouping not yet implemented")
+	// Call BecomeCoordinatorOfStandaloneGroup on the slave
+	slaveClient := NewSonosClient(slaveIP)
+	body := `<u:BecomeCoordinatorOfStandaloneGroup xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+		<InstanceID>0</InstanceID>
+	</u:BecomeCoordinatorOfStandaloneGroup>`
+
+	_, err := slaveClient.makeSoapRequest("BecomeCoordinatorOfStandaloneGroup", "AVTransport", body)
+	if err != nil {
+		return fmt.Errorf("failed to ungroup Sonos speaker: %w", err)
+	}
+	return nil
 }
 
 func (sc *SonosClient) RemoveAllSlaves() error {
-	return fmt.Errorf("Sonos grouping not yet implemented")
+	// Get zone group topology to find all members
+	members, err := sc.getGroupMemberIPs()
+	if err != nil {
+		return fmt.Errorf("failed to get group members: %w", err)
+	}
+
+	masterIP := strings.TrimPrefix(sc.baseURL, "http://")
+	masterIP = strings.TrimSuffix(masterIP, ":"+SonosPort)
+
+	var lastErr error
+	for _, memberIP := range members {
+		if memberIP != masterIP {
+			if err := sc.RemoveSlave(memberIP); err != nil {
+				lastErr = err
+			}
+		}
+	}
+	return lastErr
 }
 
 func (sc *SonosClient) LeaveGroup() error {
-	return fmt.Errorf("Sonos grouping not yet implemented")
+	// This player leaves its current group
+	body := `<u:BecomeCoordinatorOfStandaloneGroup xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+		<InstanceID>0</InstanceID>
+	</u:BecomeCoordinatorOfStandaloneGroup>`
+	_, err := sc.makeSoapRequest("BecomeCoordinatorOfStandaloneGroup", "AVTransport", body)
+	if err != nil {
+		return fmt.Errorf("failed to leave group: %w", err)
+	}
+	return nil
+}
+
+// getGroupMemberIPs returns the IPs of all members in this player's zone group.
+func (sc *SonosClient) getGroupMemberIPs() ([]string, error) {
+	data, err := sc.makeSoapRequestPath(
+		"/ZoneGroupTopology/Control",
+		"ZoneGroupTopology",
+		"GetZoneGroupState",
+		"",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract the ZoneGroupState from the SOAP response
+	stateRegex := regexp.MustCompile(`<ZoneGroupState>(.*?)</ZoneGroupState>`)
+	stateMatch := stateRegex.FindStringSubmatch(string(data))
+	if len(stateMatch) < 2 {
+		return nil, fmt.Errorf("ZoneGroupState not found in response")
+	}
+
+	decoded := html.UnescapeString(stateMatch[1])
+
+	masterIP := strings.TrimPrefix(sc.baseURL, "http://")
+	masterIP = strings.TrimSuffix(masterIP, ":"+SonosPort)
+
+	// Find the group containing this player's IP
+	locationRegex := regexp.MustCompile(`Location="http://([^:]+):`)
+	groupRegex := regexp.MustCompile(`(?s)<ZoneGroup[^>]*>.*?</ZoneGroup>`)
+
+	groups := groupRegex.FindAllString(decoded, -1)
+	for _, group := range groups {
+		locations := locationRegex.FindAllStringSubmatch(group, -1)
+		var ips []string
+		containsThis := false
+
+		for _, loc := range locations {
+			if len(loc) > 1 {
+				ip := loc[1]
+				ips = append(ips, ip)
+				if ip == masterIP {
+					containsThis = true
+				}
+			}
+		}
+
+		if containsThis {
+			return ips, nil
+		}
+	}
+
+	return []string{masterIP}, nil
 }
 
 func (sc *SonosClient) GetDeviceType() DeviceType {

@@ -41,6 +41,7 @@ type PlayerInfo struct {
 	Brand string
 	Model string
 	Type  DeviceType
+	UUID  string // Sonos RINCON ID, e.g. "RINCON_000E5872AA6801400"
 }
 
 // Generic client interface

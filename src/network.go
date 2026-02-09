@@ -337,11 +337,20 @@ func checkForSonosPlayer(ip string) (PlayerInfo, bool) {
 		}
 	}
 
+	// Extract RINCON UUID from <UDN>uuid:RINCON_XXXX</UDN>
+	uuid := ""
+	if re := regexp.MustCompile(`<UDN>uuid:(RINCON_[A-Z0-9]+)</UDN>`); re != nil {
+		if matches := re.FindStringSubmatch(bodyStr); len(matches) > 1 {
+			uuid = matches[1]
+		}
+	}
+
 	return PlayerInfo{
 		IP:    ip,
 		Name:  name,
 		Brand: "Sonos",
 		Model: model,
 		Type:  DeviceTypeSonos,
+		UUID:  uuid,
 	}, true
 }

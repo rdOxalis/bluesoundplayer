@@ -96,7 +96,7 @@ func renderTUI() {
 			fmt.Println(getText("group_combinations"))
 			for i, master := range tuiState.availablePlayers {
 				for j, slave := range tuiState.availablePlayers {
-					if i != j && master.Type == slave.Type && master.Type == DeviceTypeBluOS {
+					if i != j && master.Type == slave.Type {
 						fmt.Printf("  group %d+%d - %s + %s\n", i+1, j+1, master.Name, slave.Name)
 					}
 				}
@@ -260,19 +260,24 @@ func groupPlayers(groupSpec string) {
 	masterPlayer := tuiState.availablePlayers[masterID-1]
 	slavePlayer := tuiState.availablePlayers[slaveID-1]
 
-	// Check if both are BluOS devices
-	if masterPlayer.Type != DeviceTypeBluOS || slavePlayer.Type != DeviceTypeBluOS {
-		tuiState.lastAction = "❌ Grouping only supported for BluOS devices"
+	// Check if both are the same device type
+	if masterPlayer.Type != slavePlayer.Type {
+		tuiState.lastAction = "❌ Cannot group different device types"
 		return
 	}
 
 	// Switch to master player
-	tuiState.client = NewBluesoundClient(masterPlayer.IP)
+	switch masterPlayer.Type {
+	case DeviceTypeBluOS:
+		tuiState.client = NewBluesoundClient(masterPlayer.IP)
+	case DeviceTypeSonos:
+		tuiState.client = NewSonosClient(masterPlayer.IP)
+	}
 	tuiState.playerName = masterPlayer.Name
 
 	// Add slave to master
 	if err := tuiState.client.AddSlave(slavePlayer.IP); err != nil {
-		tuiState.lastAction = getText("error_grouping")
+		tuiState.lastAction = fmt.Sprintf("%s: %v", getText("error_grouping"), err)
 		return
 	}
 
@@ -289,15 +294,21 @@ func debugAPI() {
 	}
 }
 
-// Ungroup all players (only works for BluOS devices)
+// Ungroup all players
 func ungroupAll() {
 	if tuiState.client == nil {
 		tuiState.lastAction = "No client connected"
 		return
 	}
 
-	if tuiState.client.GetDeviceType() != DeviceTypeBluOS {
-		tuiState.lastAction = "❌ Ungrouping only supported for BluOS devices"
+	// For Sonos: use the built-in RemoveAllSlaves which queries zone topology
+	if tuiState.client.GetDeviceType() == DeviceTypeSonos {
+		if err := tuiState.client.RemoveAllSlaves(); err != nil {
+			tuiState.lastAction = fmt.Sprintf("%s: %v", getText("error_ungrouping"), err)
+		} else {
+			tuiState.lastAction = getText("ungrouped_all")
+		}
+		updateStatus()
 		return
 	}
 

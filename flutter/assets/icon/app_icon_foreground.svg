@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Speaker body -->
+  <path d="M140 180 L200 180 L280 110 L280 402 L200 332 L140 332 Z"
+        fill="#FFFFFF"
+        stroke="none"/>
+
+  <!-- Sound waves -->
+  <path d="M320 180 Q380 256 320 332"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="24"
+        stroke-linecap="round"
+        opacity="0.9"/>
+
+  <path d="M360 130 Q450 256 360 382"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="24"
+        stroke-linecap="round"
+        opacity="0.7"/>
+
+  <path d="M400 80 Q520 256 400 432"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="24"
+        stroke-linecap="round"
+        opacity="0.5"/>
+</svg>
