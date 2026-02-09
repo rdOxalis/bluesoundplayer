@@ -1,4 +1,4 @@
-# 🎵 Multi-Room Player for Bluesound and Sonos Devices
+# 🎵 Multi-Room Preset Player for Bluesound and Sonos Devices
 
 A Multi-Room audio controller with **interactive and non-interactive modes**, multi-language support, and automatic network scanning for BlueOS and Sonos devices.
 
