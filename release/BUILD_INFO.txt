@@ -1,5 +1,5 @@
-Build date: Mo 9. Feb 09:50:33 CET 2026
-Git commit: e898d04
+Build date: Di 10. Feb 08:52:10 CET 2026
+Git commit: ab4293d
 
 Platforms built:
   - bluesoundplayer-apple-amd64
