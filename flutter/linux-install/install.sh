@@ -2,22 +2,23 @@
 set -e
 
 APP_NAME="BlueSound Controller"
-INSTALL_DIR="/opt/bluesound-controller"
-BIN_LINK="/usr/local/bin/bluesound-controller"
-DESKTOP_FILE="/usr/share/applications/bluesound-controller.desktop"
+INSTALL_DIR="$HOME/.local/share/bluesound-controller"
+BIN_DIR="$HOME/.local/bin"
+DESKTOP_DIR="$HOME/.local/share/applications"
+ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root: sudo ./install.sh"
-  exit 1
-fi
 
 echo "Installing $APP_NAME..."
 
-# Remove previous installation
+# Remove previous installations
 rm -rf "$INSTALL_DIR"
-rm -f "$BIN_LINK"
-rm -f "$DESKTOP_FILE"
+rm -rf "$HOME/.local/share/bluesoundplayer"
+rm -f "$BIN_DIR/bluesound-controller"
+rm -f "$DESKTOP_DIR/bluesoundplayer.desktop"
+rm -f "$DESKTOP_DIR/bluesound-controller.desktop"
+# Clean old icons
+find "$HOME/.local/share/icons" -name "bluesoundplayer.*" -delete 2>/dev/null || true
+find "$HOME/.local/share/icons" -name "bluesound-controller.*" -delete 2>/dev/null || true
 
 # Copy app bundle
 mkdir -p "$INSTALL_DIR"
@@ -26,19 +27,27 @@ cp -r "$SCRIPT_DIR"/lib "$INSTALL_DIR/"
 cp -r "$SCRIPT_DIR"/data "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/bluesoundplayer_flutter"
 
-# Create symlink
-ln -sf "$INSTALL_DIR/bluesoundplayer_flutter" "$BIN_LINK"
+# Create bin symlink
+mkdir -p "$BIN_DIR"
+ln -sf "$INSTALL_DIR/bluesoundplayer_flutter" "$BIN_DIR/bluesound-controller"
+
+# Install icon
+mkdir -p "$ICON_DIR"
+cp "$INSTALL_DIR/data/flutter_assets/assets/icon/app_icon.png" "$ICON_DIR/bluesound-controller.png"
 
 # Create .desktop file
-cat > "$DESKTOP_FILE" << 'DESKTOP'
+mkdir -p "$DESKTOP_DIR"
+cat > "$DESKTOP_DIR/bluesound-controller.desktop" << DESKTOP
 [Desktop Entry]
 Type=Application
 Name=BlueSound Controller
 Comment=Multi-room audio controller for BluOS and Sonos
-Exec=/opt/bluesound-controller/bluesoundplayer_flutter
-Icon=audio-speakers
+Exec=$INSTALL_DIR/bluesoundplayer_flutter
+Icon=bluesound-controller
 Terminal=false
-Categories=AudioVideo;Audio;
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=bluesoundplayer_flutter
+Keywords=audio;music;sonos;bluos;multiroom;speaker;
 DESKTOP
 
 echo "Installed to $INSTALL_DIR"

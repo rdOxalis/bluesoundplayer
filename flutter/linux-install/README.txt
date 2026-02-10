@@ -11,10 +11,10 @@ Requirements
 Installation
 ------------
   tar xzf BlueSoundController-linux-x64.tar.gz
-  sudo ./install.sh
+  ./install.sh
 
-This installs to /opt/bluesound-controller/ and creates:
-- Command:    bluesound-controller
+No sudo required. Installs to ~/.local/ and creates:
+- Command:    bluesound-controller  (in ~/.local/bin/)
 - App menu:   "BlueSound Controller"
 
 Run without installing
@@ -24,6 +24,7 @@ Run without installing
 
 Uninstall
 ---------
-  sudo rm -rf /opt/bluesound-controller
-  sudo rm -f /usr/local/bin/bluesound-controller
-  sudo rm -f /usr/share/applications/bluesound-controller.desktop
+  rm -rf ~/.local/share/bluesound-controller
+  rm -f ~/.local/bin/bluesound-controller
+  rm -f ~/.local/share/applications/bluesound-controller.desktop
+  rm -f ~/.local/share/icons/hicolor/256x256/apps/bluesound-controller.png
