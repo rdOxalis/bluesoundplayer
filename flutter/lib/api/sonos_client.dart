@@ -189,12 +189,12 @@ class SonosClient implements AudioClient {
   Future<List<Preset>> getPresets() async {
     if (_cachedFavorites != null) {
       return _cachedFavorites!
-          .map((f) => Preset(id: f.id, name: f.name))
+          .map((f) => Preset(id: f.id, name: f.name, category: f.category))
           .toList();
     }
 
     final favorites = <_SonosFavorite>[];
-    final objectIds = ['R:0/0', 'R:0/1', 'FV:2', 'A:RADIO'];
+    final objectIds = ['FV:2', 'R:0/0', 'R:0/1', 'A:RADIO'];
 
     final seenNames = <String>{};
 
@@ -216,12 +216,10 @@ class SonosClient implements AudioClient {
         if (result.isNotEmpty) {
           final items = _parseBrowseResult(result);
           for (final item in items) {
-            if (_isRadioStation(item)) {
-              // Deduplicate by name
-              if (!seenNames.contains(item.name)) {
-                seenNames.add(item.name);
-                favorites.add(item);
-              }
+            // Deduplicate by name
+            if (!seenNames.contains(item.name)) {
+              seenNames.add(item.name);
+              favorites.add(item);
             }
           }
         }
@@ -235,14 +233,18 @@ class SonosClient implements AudioClient {
         name: favorites[i].name,
         uri: favorites[i].uri,
         meta: favorites[i].meta,
+        category: favorites[i].category,
+        isContainer: favorites[i].isContainer,
       );
     }
 
     _cachedFavorites = favorites;
-    return favorites.map((f) => Preset(id: f.id, name: f.name)).toList();
+    return favorites
+        .map((f) => Preset(id: f.id, name: f.name, category: f.category))
+        .toList();
   }
 
-  /// Parse Browse response DIDL content.
+  /// Parse Browse response DIDL content (handles both <item> and <container>).
   List<_SonosFavorite> _parseBrowseResult(String didl) {
     final results = <_SonosFavorite>[];
     try {
@@ -254,27 +256,52 @@ class SonosClient implements AudioClient {
 
       final document = XmlDocument.parse(decoded);
 
-      for (final item in document.findAllElements('item')) {
+      // Process both <item> and <container> elements
+      final elements = [
+        ...document.findAllElements('item'),
+        ...document.findAllElements('container'),
+      ];
+
+      for (final element in elements) {
         String title = '';
         String uri = '';
+        String upnpClass = '';
+        final itemId = element.getAttribute('id') ?? '';
 
-        for (final child in item.children.whereType<XmlElement>()) {
+        for (final child in element.children.whereType<XmlElement>()) {
           final localName = child.name.local;
           if (localName == 'title') {
             title = child.innerText;
           } else if (localName == 'res') {
             uri = child.innerText;
+          } else if (localName == 'class') {
+            upnpClass = child.innerText;
           }
         }
 
         if (title.isNotEmpty) {
-          // Store the full item XML as metadata (for use in SetAVTransportURI)
-          final itemXml = item.toXmlString(pretty: false);
+          final category = _categorize(upnpClass, uri);
+          if (category == null) continue;
+
+          // Detect container-type by upnp:class (even if XML element is <item>)
+          var isContainerType = upnpClass.toLowerCase().contains('container') ||
+              upnpClass.toLowerCase().contains('album');
+
+          // For items without a <res> URI, construct from item ID
+          if (uri.isEmpty && itemId.isNotEmpty) {
+            uri = 'x-rincon-cpcontainer:$itemId';
+            // Items without <res> always need queue-based playback
+            isContainerType = true;
+          }
+
+          final meta = element.toXmlString(pretty: false);
           results.add(_SonosFavorite(
             id: 0,
             name: title,
             uri: uri,
-            meta: itemXml, // Store full item XML
+            meta: meta,
+            category: category,
+            isContainer: isContainerType,
           ));
         }
       }
@@ -282,41 +309,62 @@ class SonosClient implements AudioClient {
     return results;
   }
 
-  /// Check if item is a radio station based on URI and metadata patterns.
-  bool _isRadioStation(_SonosFavorite item) {
-    final uri = item.uri.toLowerCase();
-    final meta = item.meta.toLowerCase();
-    final name = item.name.toLowerCase();
+  /// Categorize a Sonos favorite by its UPnP class, URI, and metadata.
+  /// Returns null for unrecognized types.
+  PresetCategory? _categorize(String upnpClass, String uri) {
+    final cls = upnpClass.toLowerCase();
+    final lowerUri = uri.toLowerCase();
 
-    // Check URI patterns
-    if (uri.contains('x-sonosapi-stream:') ||
-        uri.contains('x-sonosapi-radio:') ||
-        uri.contains('x-rincon-mp3radio:') ||
-        uri.startsWith('http://') ||
-        uri.startsWith('https://') ||
-        uri.contains('mms://') ||
-        uri.contains('rtsp://') ||
-        uri.contains('x-sonos-http:')) {
-      return true;
+    // Album lists (meta-containers, not directly playable)
+    if (cls.contains('albumlist')) {
+      return null;
     }
 
-    // Check metadata class
-    if (meta.contains('audiobroadcast') ||
-        meta.contains('radio') ||
-        meta.contains('broadcast')) {
-      return true;
+    // Radio / audio broadcast
+    if (cls.contains('audiobroadcast') || cls.contains('radio')) {
+      return PresetCategory.station;
+    }
+    // Music track
+    if (cls.contains('musictrack') || cls.contains('audioitem') && !cls.contains('broadcast')) {
+      // audioItem without broadcast → song (unless URI says otherwise)
+      if (lowerUri.contains('x-sonosapi-stream:') ||
+          lowerUri.contains('x-sonosapi-radio:') ||
+          lowerUri.contains('x-rincon-mp3radio:')) {
+        return PresetCategory.station;
+      }
+      if (cls.contains('musictrack')) return PresetCategory.song;
+    }
+    // Album
+    if (cls.contains('musicalbum') || cls.contains('album')) {
+      return PresetCategory.album;
+    }
+    // Playlist container
+    if (cls.contains('playlistcontainer') || cls.contains('playlist')) {
+      return PresetCategory.playlist;
+    }
+    // StorageFolder or generic container → playlist
+    if (cls.contains('container') || cls.contains('storagefolder')) {
+      return PresetCategory.playlist;
     }
 
-    // Check name patterns
-    if (name.contains('radio') ||
-        name.contains(' fm') ||
-        name.contains(' am') ||
-        name.contains('stream') ||
-        name.contains('live')) {
-      return true;
+    // URI-based fallback for items without clear class
+    if (lowerUri.contains('x-sonosapi-stream:') ||
+        lowerUri.contains('x-sonosapi-radio:') ||
+        lowerUri.contains('x-rincon-mp3radio:') ||
+        lowerUri.contains('mms://') ||
+        lowerUri.contains('rtsp://')) {
+      return PresetCategory.station;
+    }
+    if (lowerUri.contains('x-sonosapi-hls:') ||
+        lowerUri.contains('x-sonos-spotify:') ||
+        lowerUri.contains('x-sonos-http:')) {
+      return PresetCategory.playlist;
+    }
+    if (lowerUri.startsWith('http://') || lowerUri.startsWith('https://')) {
+      return PresetCategory.station;
     }
 
-    return false;
+    return null;
   }
 
   @override
@@ -334,12 +382,22 @@ class SonosClient implements AudioClient {
       throw AudioClientException('Preset $id not found');
     }
 
+    // Container types (playlists, albums) need queue-based playback.
+    // Direct URIs (streams, single tracks) use SetAVTransportURI.
+    if (favorite.isContainer) {
+      await _playContainer(favorite);
+    } else {
+      await _playItem(favorite);
+    }
+  }
+
+  /// Play an item-type favorite via SetAVTransportURI (stations, songs).
+  Future<void> _playItem(_SonosFavorite favorite) async {
     final escapedUri = _escapeXml(favorite.uri);
 
     // Use the original item metadata from browse response, wrapped in DIDL-Lite
     String metadata;
     if (favorite.meta.isNotEmpty) {
-      // Wrap original item in DIDL-Lite envelope and escape for XML
       metadata = _escapeXml(
         '<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" '
         'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" '
@@ -349,7 +407,6 @@ class SonosClient implements AudioClient {
         '</DIDL-Lite>',
       );
     } else {
-      // Fallback: minimal metadata with TuneIn service
       metadata = _escapeXml(
         '<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" '
         'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" '
@@ -363,7 +420,6 @@ class SonosClient implements AudioClient {
       );
     }
 
-    // Use SetAVTransportURI with original metadata
     await _soap(
       '/MediaRenderer/AVTransport/Control',
       'AVTransport',
@@ -373,8 +429,82 @@ class SonosClient implements AudioClient {
 <CurrentURIMetaData>$metadata</CurrentURIMetaData>''',
     );
 
-    // Play
     await play();
+  }
+
+  /// Play a container-type favorite via queue (playlists, albums).
+  Future<void> _playContainer(_SonosFavorite favorite) async {
+
+    final escapedUri = _escapeXml(favorite.uri);
+
+    // Build metadata: wrap the item XML in DIDL-Lite envelope and escape
+    String metadata = '';
+    if (favorite.meta.isNotEmpty) {
+      metadata = _escapeXml(
+        '<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" '
+        'xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" '
+        'xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" '
+        'xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">'
+        '${favorite.meta}'
+        '</DIDL-Lite>',
+      );
+    }
+
+    // 1. Clear queue
+    await _soap(
+      '/MediaRenderer/AVTransport/Control',
+      'AVTransport',
+      'RemoveAllTracksFromQueue',
+      '<InstanceID>0</InstanceID>',
+    );
+
+    // 2. Add container to queue
+    await _soap(
+      '/MediaRenderer/AVTransport/Control',
+      'AVTransport',
+      'AddURIToQueue',
+      '''<InstanceID>0</InstanceID>
+<EnqueuedURI>$escapedUri</EnqueuedURI>
+<EnqueuedURIMetaData>$metadata</EnqueuedURIMetaData>
+<DesiredFirstTrackNumberEnqueued>0</DesiredFirstTrackNumberEnqueued>
+<EnqueueAsNext>1</EnqueueAsNext>''',
+    );
+
+    // 3. Switch transport to the queue
+    final uuid = await _getDeviceUuid();
+    if (uuid != null) {
+      await _soap(
+        '/MediaRenderer/AVTransport/Control',
+        'AVTransport',
+        'SetAVTransportURI',
+        '<InstanceID>0</InstanceID>'
+        '<CurrentURI>x-rincon-queue:$uuid#0</CurrentURI>'
+        '<CurrentURIMetaData></CurrentURIMetaData>',
+      );
+    }
+
+    // 4. Play
+    await play();
+  }
+
+  String? _cachedUuid;
+
+  /// Get the RINCON UUID of this device.
+  Future<String?> _getDeviceUuid() async {
+    if (_cachedUuid != null) return _cachedUuid;
+    try {
+      final response = await _httpClient
+          .get(Uri.parse('$_baseUrl/xml/device_description.xml'))
+          .timeout(timeout);
+      if (response.statusCode != 200) return null;
+      final body = utf8.decode(response.bodyBytes);
+      final match =
+          RegExp(r'<UDN>uuid:(RINCON_[A-Z0-9]+)</UDN>').firstMatch(body);
+      _cachedUuid = match?.group(1);
+      return _cachedUuid;
+    } catch (_) {
+      return null;
+    }
   }
 
   String _escapeXml(String input) {
@@ -718,11 +848,15 @@ class _SonosFavorite {
   final String name;
   final String uri;
   final String meta;
+  final PresetCategory category;
+  final bool isContainer;
 
   _SonosFavorite({
     required this.id,
     required this.name,
     required this.uri,
     required this.meta,
+    required this.category,
+    required this.isContainer,
   });
 }

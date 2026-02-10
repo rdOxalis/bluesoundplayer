@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/models.dart';
 import '../providers/providers.dart';
 import '../widgets/widgets.dart';
 
@@ -69,7 +70,7 @@ class PresetsScreen extends ConsumerWidget {
   }
 }
 
-/// List view of available presets.
+/// List view of available presets, grouped by category.
 class PresetsListView extends ConsumerWidget {
   const PresetsListView({super.key});
 
@@ -135,37 +136,90 @@ class PresetsListView extends ConsumerWidget {
       );
     }
 
-    return ListView.builder(
-      itemCount: presetsState.presets.length,
-      itemBuilder: (context, index) {
-        final preset = presetsState.presets[index];
+    // Build category groups
+    final groups = <_CategoryGroup>[
+      if (presetsState.stations.isNotEmpty)
+        _CategoryGroup(
+          title: l10n.categoryStations,
+          icon: Icons.radio,
+          presets: presetsState.stations,
+        ),
+      if (presetsState.playlists.isNotEmpty)
+        _CategoryGroup(
+          title: l10n.categoryPlaylists,
+          icon: Icons.playlist_play,
+          presets: presetsState.playlists,
+        ),
+      if (presetsState.albums.isNotEmpty)
+        _CategoryGroup(
+          title: l10n.categoryAlbums,
+          icon: Icons.album,
+          presets: presetsState.albums,
+        ),
+      if (presetsState.songs.isNotEmpty)
+        _CategoryGroup(
+          title: l10n.categorySongs,
+          icon: Icons.music_note,
+          presets: presetsState.songs,
+        ),
+    ];
 
-        return PresetTile(
-          preset: preset,
-          onTap: () async {
-            try {
-              await ref.read(presetsProvider.notifier).playPreset(preset.id);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${l10n.playingPreset}: ${preset.name}'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${l10n.failedToPlayPreset}: $e'),
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                );
-              }
-            }
-          },
+    return ListView.builder(
+      itemCount: groups.length,
+      itemBuilder: (context, index) {
+        final group = groups[index];
+        return ExpansionTile(
+          leading: Icon(group.icon),
+          title: Text('${group.title} (${group.presets.length})'),
+          initiallyExpanded: true,
+          children: group.presets.map((preset) {
+            return PresetTile(
+              preset: preset,
+              onTap: () => _playPreset(context, ref, l10n, preset),
+            );
+          }).toList(),
         );
       },
     );
   }
+
+  Future<void> _playPreset(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+    Preset preset,
+  ) async {
+    try {
+      await ref.read(presetsProvider.notifier).playPreset(preset.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l10n.playingPreset}: ${preset.name}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${l10n.failedToPlayPreset}: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+}
+
+class _CategoryGroup {
+  final String title;
+  final IconData icon;
+  final List<Preset> presets;
+
+  const _CategoryGroup({
+    required this.title,
+    required this.icon,
+    required this.presets,
+  });
 }

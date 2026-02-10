@@ -49,6 +49,10 @@ class AppLocalizations {
       'reload': 'Reload',
       'playingPreset': 'Playing',
       'failedToPlayPreset': 'Failed to play preset',
+      'categoryStations': 'Stations',
+      'categoryPlaylists': 'Playlists',
+      'categoryAlbums': 'Albums',
+      'categorySongs': 'Songs',
 
       // Volume
       'volume': 'Volume',
@@ -127,6 +131,10 @@ class AppLocalizations {
       'reload': 'Neu laden',
       'playingPreset': 'Spielt',
       'failedToPlayPreset': 'Preset konnte nicht abgespielt werden',
+      'categoryStations': 'Sender',
+      'categoryPlaylists': 'Playlists',
+      'categoryAlbums': 'Alben',
+      'categorySongs': 'Songs',
 
       // Volume
       'volume': 'Lautstärke',
@@ -205,6 +213,10 @@ class AppLocalizations {
       'reload': 'Pakia upya',
       'playingPreset': 'Inacheza',
       'failedToPlayPreset': 'Imeshindwa kucheza preset',
+      'categoryStations': 'Vituo',
+      'categoryPlaylists': 'Orodha za Nyimbo',
+      'categoryAlbums': 'Albamu',
+      'categorySongs': 'Nyimbo',
 
       // Volume
       'volume': 'Sauti',
@@ -290,6 +302,10 @@ class AppLocalizations {
   String get reload => get('reload');
   String get playingPreset => get('playingPreset');
   String get failedToPlayPreset => get('failedToPlayPreset');
+  String get categoryStations => get('categoryStations');
+  String get categoryPlaylists => get('categoryPlaylists');
+  String get categoryAlbums => get('categoryAlbums');
+  String get categorySongs => get('categorySongs');
 
   // Volume
   String get volume => get('volume');

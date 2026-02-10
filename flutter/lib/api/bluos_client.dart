@@ -128,7 +128,13 @@ class BluOSClient implements AudioClient {
       final image = preset.getAttribute('image') ?? '';
 
       if (id > 0 && name.isNotEmpty) {
-        presets.add(Preset(id: id, name: name, url: url, image: image));
+        presets.add(Preset(
+          id: id,
+          name: name,
+          url: url,
+          image: image,
+          category: _categorizePreset(url),
+        ));
       }
     }
 
@@ -256,6 +262,15 @@ Endpoints:
   GET /RemoveAllSlaves - Remove all slaves
   GET /LeaveGroup - Leave group as slave
   GET /SyncStatus - Get device info''';
+  }
+
+  /// Categorize a BluOS preset by its URL pattern.
+  PresetCategory _categorizePreset(String url) {
+    final lower = url.toLowerCase();
+    // Service-loaded content (Deezer playlists, albums, etc.)
+    if (lower.startsWith('/load?service=')) return PresetCategory.playlist;
+    // Everything else is a radio station/stream
+    return PresetCategory.station;
   }
 
   /// Detect if this IP hosts a BluOS device and get its info.

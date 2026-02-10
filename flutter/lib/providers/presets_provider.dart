@@ -16,6 +16,15 @@ class PresetsState {
     this.error,
   });
 
+  List<Preset> get stations =>
+      presets.where((p) => p.category == PresetCategory.station).toList();
+  List<Preset> get playlists =>
+      presets.where((p) => p.category == PresetCategory.playlist).toList();
+  List<Preset> get albums =>
+      presets.where((p) => p.category == PresetCategory.album).toList();
+  List<Preset> get songs =>
+      presets.where((p) => p.category == PresetCategory.song).toList();
+
   PresetsState copyWith({
     List<Preset>? presets,
     bool? isLoading,

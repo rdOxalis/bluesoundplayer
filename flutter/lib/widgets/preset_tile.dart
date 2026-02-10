@@ -13,6 +13,19 @@ class PresetTile extends StatelessWidget {
     this.onTap,
   });
 
+  IconData _categoryIcon(PresetCategory category) {
+    switch (category) {
+      case PresetCategory.station:
+        return Icons.radio;
+      case PresetCategory.playlist:
+        return Icons.playlist_play;
+      case PresetCategory.album:
+        return Icons.album;
+      case PresetCategory.song:
+        return Icons.music_note;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -25,14 +38,9 @@ class PresetTile extends StatelessWidget {
           color: theme.colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Center(
-          child: Text(
-            '${preset.id}',
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        child: Icon(
+          _categoryIcon(preset.category),
+          color: theme.colorScheme.onPrimaryContainer,
         ),
       ),
       title: Text(
