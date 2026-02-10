@@ -287,27 +287,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final hasPlayer = ref.watch(playersProvider).selectedPlayer != null;
     final isAutoRefreshActive = settings.autoRefresh && hasPlayer;
 
+    final selectedPlayer = ref.watch(playersProvider).selectedPlayer;
+
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Text(l10n.appTitle),
-            if (isAutoRefreshActive) ...[
-              const SizedBox(width: 8),
-              Icon(Icons.sync, size: 16, color: Colors.green.shade400),
-            ],
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.read(playersProvider.notifier).scan();
-              ref.read(statusProvider.notifier).refresh();
-            },
-            tooltip: l10n.refreshNow,
-          ),
-        ],
+        title: Text(selectedPlayer?.shortName ?? l10n.appTitle),
       ),
       body: IndexedStack(
         index: _selectedIndex,

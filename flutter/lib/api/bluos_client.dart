@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
@@ -40,7 +41,7 @@ class BluOSClient implements AudioClient {
         );
       }
 
-      return response.body;
+      return utf8.decode(response.bodyBytes);
     } on TimeoutException {
       throw const AudioClientException('Request timed out');
     } catch (e) {
@@ -267,7 +268,7 @@ Endpoints:
 
       if (response.statusCode != 200) return null;
 
-      final document = XmlDocument.parse(response.body);
+      final document = XmlDocument.parse(utf8.decode(response.bodyBytes));
       final syncStatus = document.findAllElements('SyncStatus').firstOrNull;
       if (syncStatus == null) return null;
 

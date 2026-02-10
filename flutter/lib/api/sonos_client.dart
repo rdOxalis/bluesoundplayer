@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
@@ -58,7 +59,7 @@ class SonosClient implements AudioClient {
         );
       }
 
-      return response.body;
+      return utf8.decode(response.bodyBytes);
     } on TimeoutException {
       throw const AudioClientException('Request timed out');
     } catch (e) {
@@ -653,21 +654,8 @@ Note: Grouping is not supported for Sonos devices.''';
 
       if (response.statusCode != 200) return null;
 
-      final body = response.body;
+      final body = utf8.decode(response.bodyBytes);
       if (!body.contains('Sonos') && !body.contains('RINCON')) return null;
-
-      // Extract friendly name
-      String name = ip;
-      final nameMatch = RegExp(r'<friendlyName>([^<]+)</friendlyName>')
-          .firstMatch(body);
-      if (nameMatch != null) {
-        name = nameMatch.group(1) ?? ip;
-        // Clean up name (remove IP suffix, RINCON_, etc.)
-        name = name
-            .replaceAll(RegExp(r'\s*-\s*\d+\.\d+\.\d+\.\d+'), '')
-            .replaceAll(RegExp(r'\s*-?\s*RINCON_?[A-Z0-9]+.*'), '')
-            .trim();
-      }
 
       // Extract model
       String model = 'Sonos';
@@ -675,6 +663,31 @@ Note: Grouping is not supported for Sonos devices.''';
           .firstMatch(body);
       if (modelMatch != null) {
         model = modelMatch.group(1) ?? 'Sonos';
+      }
+
+      // Extract room name (preferred) or friendly name as fallback
+      String name = '';
+      final roomMatch = RegExp(r'<roomName>([^<]+)</roomName>')
+          .firstMatch(body);
+      if (roomMatch != null) {
+        name = roomMatch.group(1) ?? '';
+      }
+      if (name.isEmpty) {
+        final nameMatch = RegExp(r'<friendlyName>([^<]+)</friendlyName>')
+            .firstMatch(body);
+        if (nameMatch != null) {
+          name = nameMatch.group(1) ?? '';
+          // Clean up name (remove IP, RINCON_, etc.)
+          name = name
+              .replaceAll(RegExp(r'\d+\.\d+\.\d+\.\d+\s*-?\s*'), '')
+              .replaceAll(RegExp(r'\s*-\s*\d+\.\d+\.\d+\.\d+'), '')
+              .replaceAll(RegExp(r'\s*-?\s*RINCON_?[A-Z0-9]+.*'), '')
+              .trim();
+        }
+      }
+      // Fallback to model name, never show just the IP
+      if (name.isEmpty) {
+        name = model;
       }
 
       // Extract RINCON UUID from <UDN>uuid:RINCON_XXXX</UDN>

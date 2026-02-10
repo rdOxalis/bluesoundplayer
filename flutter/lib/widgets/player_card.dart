@@ -150,13 +150,6 @@ class PlayerCard extends StatelessWidget {
                 ),
               ),
 
-              if (isSelected) ...[
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.check_circle,
-                  color: colorScheme.primary,
-                ),
-              ],
             ],
           ),
         ),
