@@ -2,6 +2,10 @@
 
 A Multi-Room audio controller with **interactive and non-interactive modes**, multi-language support, and automatic network scanning for BlueOS and Sonos devices.
 
+## Important Hint 
+
+This application was co-authored by an AI. If you do not like that, do not clone or use.
+
 ## ✨ Features
 
 - 🔍 **Automatic Network Scanning** - Finds all BluOS and Sonos players on your network
