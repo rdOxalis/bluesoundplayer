@@ -144,6 +144,24 @@ class SonosClient implements AudioClient {
       volume = int.tryParse(volumeStr) ?? -1;
     } catch (_) {}
 
+    // If no track info and player might be a grouped member, fetch coordinator's status
+    if (song.isEmpty && artist.isEmpty) {
+      try {
+        final groupInfo = await getGroupInfo();
+        // Find coordinator IP for this player
+        for (final entry in groupInfo.entries) {
+          if (entry.value.contains(_ip)) {
+            final coordinatorClient = SonosClient(entry.key);
+            final coordStatus = await coordinatorClient.getStatus();
+            song = coordStatus.song;
+            artist = coordStatus.artist;
+            album = coordStatus.album;
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
     return Status(
       state: state,
       song: song,

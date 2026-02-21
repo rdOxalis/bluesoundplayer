@@ -40,6 +40,16 @@ class _VolumeSliderState extends ConsumerState<VolumeSlider> {
   Widget _buildHorizontalSlider(double value, bool enabled, AppLocalizations l10n) {
     return Row(
       children: [
+        IconButton(
+          icon: const Icon(Icons.remove, size: 20),
+          onPressed: enabled
+              ? () => _setVolume((value - 5).round().clamp(0, 100), l10n)
+              : null,
+          tooltip: '-5%',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        ),
         Icon(
           value == 0 ? Icons.volume_off : Icons.volume_down,
           size: 24,
@@ -74,7 +84,17 @@ class _VolumeSliderState extends ConsumerState<VolumeSlider> {
           size: 24,
           color: enabled ? null : Theme.of(context).disabledColor,
         ),
-        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.add, size: 20),
+          onPressed: enabled
+              ? () => _setVolume((value + 5).round().clamp(0, 100), l10n)
+              : null,
+          tooltip: '+5%',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        ),
+        const SizedBox(width: 4),
         SizedBox(
           width: 48,
           child: Text(
@@ -93,6 +113,16 @@ class _VolumeSliderState extends ConsumerState<VolumeSlider> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        IconButton(
+          icon: const Icon(Icons.add, size: 20),
+          onPressed: enabled
+              ? () => _setVolume((value + 5).round().clamp(0, 100), l10n)
+              : null,
+          tooltip: '+5%',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        ),
         Icon(
           Icons.volume_up,
           size: 24,
@@ -130,6 +160,16 @@ class _VolumeSliderState extends ConsumerState<VolumeSlider> {
           value == 0 ? Icons.volume_off : Icons.volume_down,
           size: 24,
           color: enabled ? null : Theme.of(context).disabledColor,
+        ),
+        IconButton(
+          icon: const Icon(Icons.remove, size: 20),
+          onPressed: enabled
+              ? () => _setVolume((value - 5).round().clamp(0, 100), l10n)
+              : null,
+          tooltip: '-5%',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
         ),
         const SizedBox(height: 4),
         Text(

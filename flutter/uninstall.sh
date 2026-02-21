@@ -1,84 +1,31 @@
 #!/bin/bash
 #
-# BlueSound Controller - Linux Uninstallation Script
-#
-# Usage:
-#   ./uninstall.sh          - Uninstall user installation
-#   sudo ./uninstall.sh -s  - Uninstall system-wide installation
+# BlueSound Controller - Uninstall
 #
 
 set -e
 
-APP_NAME="bluesoundplayer"
-APP_DISPLAY_NAME="BlueSound Controller"
+echo "Uninstalling BlueSound Controller..."
 
-# Determine installation type
-SYSTEM_WIDE=false
-if [ "$1" = "-s" ] || [ "$1" = "--system" ]; then
-    SYSTEM_WIDE=true
-fi
+# Remove app files
+rm -rf "$HOME/.local/share/bluesound-controller"
+rm -rf "$HOME/.local/share/bluesoundplayer"
 
-if [ "$SYSTEM_WIDE" = true ]; then
-    if [ "$EUID" -ne 0 ]; then
-        echo "Error: System-wide uninstallation requires root privileges."
-        echo "Please run: sudo $0 -s"
-        exit 1
-    fi
-    INSTALL_DIR="/opt/$APP_NAME"
-    DESKTOP_DIR="/usr/share/applications"
-    ICON_DIR="/usr/share/icons/hicolor"
-    echo "Uninstalling system-wide installation..."
-else
-    INSTALL_DIR="$HOME/.local/share/$APP_NAME"
-    DESKTOP_DIR="$HOME/.local/share/applications"
-    ICON_DIR="$HOME/.local/share/icons/hicolor"
-    echo "Uninstalling user installation..."
-fi
+# Remove bin symlink
+rm -f "$HOME/.local/bin/bluesound-controller"
 
-# Remove application files
-if [ -d "$INSTALL_DIR" ]; then
-    echo "Removing application files from $INSTALL_DIR..."
-    rm -rf "$INSTALL_DIR"
-else
-    echo "Application directory not found: $INSTALL_DIR"
-fi
+# Remove desktop entries (both old and new naming)
+rm -f "$HOME/.local/share/applications/bluesound-controller.desktop"
+rm -f "$HOME/.local/share/applications/bluesoundplayer.desktop"
 
-# Remove desktop entry
-DESKTOP_FILE="$DESKTOP_DIR/$APP_NAME.desktop"
-if [ -f "$DESKTOP_FILE" ]; then
-    echo "Removing desktop entry..."
-    rm -f "$DESKTOP_FILE"
-else
-    echo "Desktop entry not found: $DESKTOP_FILE"
-fi
-
-# Remove icons
-echo "Removing icons..."
-for SIZE in 16 24 32 48 64 128 256 512; do
-    ICON_FILE="$ICON_DIR/${SIZE}x${SIZE}/apps/$APP_NAME.png"
-    if [ -f "$ICON_FILE" ]; then
-        rm -f "$ICON_FILE"
-    fi
+# Remove icons (both old and new naming)
+ICON_BASE="$HOME/.local/share/icons/hicolor"
+for size in 16 24 32 48 64 128 256 512; do
+    rm -f "$ICON_BASE/${size}x${size}/apps/bluesound-controller.png"
+    rm -f "$ICON_BASE/${size}x${size}/apps/bluesoundplayer.png"
 done
+gtk-update-icon-cache -f -t "$ICON_BASE" 2>/dev/null || true
 
-# Update icon cache
-if [ "$SYSTEM_WIDE" = true ]; then
-    gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
-else
-    gtk-update-icon-cache -f -t "$ICON_DIR" 2>/dev/null || true
-fi
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 
-# Update desktop database
-if [ "$SYSTEM_WIDE" = true ]; then
-    update-desktop-database /usr/share/applications 2>/dev/null || true
-else
-    update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
-fi
-
-echo ""
-echo "=========================================="
-echo " Uninstallation complete!"
-echo "=========================================="
-echo ""
-echo " '$APP_DISPLAY_NAME' has been removed from your system."
-echo ""
+echo "BlueSound Controller has been removed."

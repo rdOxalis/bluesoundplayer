@@ -106,6 +106,23 @@ class BluOSClient implements AudioClient {
       } catch (_) {}
     }
 
+    // If no track info and player might be a grouped slave, fetch master's status
+    if (song.isEmpty && artist.isEmpty) {
+      try {
+        final syncXml = await _get('/SyncStatus');
+        final syncDoc = XmlDocument.parse(syncXml);
+        final masterEl = syncDoc.findAllElements('master').firstOrNull;
+        final masterIp = masterEl?.innerText.trim() ?? '';
+        if (masterIp.isNotEmpty) {
+          final masterClient = BluOSClient(masterIp);
+          final masterStatus = await masterClient.getStatus();
+          song = masterStatus.song;
+          artist = masterStatus.artist;
+          album = masterStatus.album;
+        }
+      } catch (_) {}
+    }
+
     return Status(
       state: getText('state').isEmpty ? 'stopped' : getText('state'),
       song: song,

@@ -14,7 +14,27 @@ A Multi-Room audio controller with **interactive and non-interactive modes**, mu
 
 ## 📦 Installation
 
-### Option 1: Build from Source
+### Desktop App (Flutter) — Linux
+
+Download `BlueSoundController-linux-x64.tar.gz` from the [Releases](release/) and install:
+
+```bash
+tar xzf BlueSoundController-linux-x64.tar.gz
+cd BlueSoundController-linux-x64
+./install.sh
+```
+
+No sudo required. Installs to `~/.local/` and creates:
+- **App menu entry:** "BlueSound Controller"
+- **Command:** `bluesound-controller`
+
+To uninstall: `~/.local/share/bluesound-controller/` entfernen oder `./uninstall.sh` im Flutter-Verzeichnis.
+
+### Desktop App (Flutter) — Android
+
+Download `BlueSoundController.apk` from the [Releases](release/) and install on your Android device.
+
+### CLI — Build from Source
 
 ```bash
 # Clone the repository
@@ -26,7 +46,21 @@ cd src
 go build -o ../bluesoundplayer *.go
 ```
 
-### Option 2: Build for Multiple Platforms
+### CLI — Pre-built Binaries
+
+Download from [Releases](release/):
+
+| Platform | Binary |
+|----------|--------|
+| Linux x64 | `bluesoundplayer-linux-amd64` |
+| Linux ARM64 | `bluesoundplayer-linux-arm64` |
+| Linux ARMv7 (Raspberry Pi) | `bluesoundplayer-linux-armv7` |
+| Linux ARMv6 (Pi Zero) | `bluesoundplayer-linux-armv6` |
+| macOS Intel | `bluesoundplayer-apple-amd64` |
+| macOS Apple Silicon | `bluesoundplayer-apple-arm64` |
+| Windows x64 | `bluesoundplayer-win-amd64.exe` |
+
+### CLI — Build for Multiple Platforms
 
 ```bash
 # Using Makefile

@@ -1,5 +1,5 @@
-Build Version: 2025.10.10-7-g34d8c82-dirty
-Build Date: 2026-02-10 17:54:23
+Build date: Sa 21. Feb 09:34:58 CET 2026
+Git commit: 76741f1
 
 Platforms built:
   - bluesoundplayer-apple-amd64
