@@ -91,6 +91,13 @@ class AppLocalizations {
       'ungroupingFailed': 'Ungrouping failed',
       'selectPlayersToGroup': 'Select players to group with',
 
+      // Transfer
+      'transfer': 'Transfer',
+      'transferTo': 'Transfer to',
+      'transferSuccess': 'Transferred',
+      'transferFailed': 'Transfer failed',
+      'nothingPlaying': 'Cannot transfer (streaming service or nothing playing)',
+
       // Errors
       'error': 'Error',
       'scanningNetwork': 'Scanning network...',
@@ -173,6 +180,13 @@ class AppLocalizations {
       'ungroupingFailed': 'Trennung fehlgeschlagen',
       'selectPlayersToGroup': 'Player zum Gruppieren auswählen',
 
+      // Transfer
+      'transfer': 'Übergeben',
+      'transferTo': 'Übergeben an',
+      'transferSuccess': 'Übergeben',
+      'transferFailed': 'Übergabe fehlgeschlagen',
+      'nothingPlaying': 'Übergabe nicht möglich (Streaming-Dienst oder nichts aktiv)',
+
       // Errors
       'error': 'Fehler',
       'scanningNetwork': 'Scanne Netzwerk...',
@@ -254,6 +268,13 @@ class AppLocalizations {
       'groupingFailed': 'Kuunganisha kumeshindwa',
       'ungroupingFailed': 'Kutenganisha kumeshindwa',
       'selectPlayersToGroup': 'Chagua vichezaji vya kuunganisha',
+
+      // Transfer
+      'transfer': 'Hamisha',
+      'transferTo': 'Hamisha kwa',
+      'transferSuccess': 'Imehamishwa',
+      'transferFailed': 'Kuhamisha kumeshindwa',
+      'nothingPlaying': 'Haiwezekani kuhamisha (huduma ya utiririshaji au hakuna kinachocheza)',
 
       // Errors
       'error': 'Hitilafu',
@@ -343,6 +364,13 @@ class AppLocalizations {
   String get groupingFailed => get('groupingFailed');
   String get ungroupingFailed => get('ungroupingFailed');
   String get selectPlayersToGroup => get('selectPlayersToGroup');
+
+  // Transfer
+  String get transfer => get('transfer');
+  String get transferTo => get('transferTo');
+  String get transferSuccess => get('transferSuccess');
+  String get transferFailed => get('transferFailed');
+  String get nothingPlaying => get('nothingPlaying');
 
   // Errors
   String get error => get('error');

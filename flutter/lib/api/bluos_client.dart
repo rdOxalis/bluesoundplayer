@@ -164,6 +164,41 @@ class BluOSClient implements AudioClient {
   }
 
   @override
+  Future<({String uri, String metadata, String? resolvedUri})?> getPlaybackInfo() async {
+    try {
+      final xml = await _get('/Status');
+      final document = XmlDocument.parse(xml);
+      final status = document.findAllElements('status').first;
+
+      String getText(String name) {
+        final elements = status.findElements(name);
+        return elements.isEmpty ? '' : elements.first.innerText;
+      }
+
+      // Try various URL fields that BluOS may provide
+      for (final field in ['streamUrl', 'serviceUrl', 'url']) {
+        final value = getText(field);
+        if (value.isNotEmpty) {
+          return (uri: value, metadata: '', resolvedUri: null);
+        }
+      }
+
+      // If state is playing but no URL field, the content is service-managed.
+      // For BluOS→BluOS transfer, we can use /Pause + /Play on the target
+      // if both use the same service. But we have no URI to transfer.
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> playUri(String uri, String metadata) async {
+    final encodedUri = Uri.encodeComponent(uri);
+    await _get('/Play?url=$encodedUri');
+  }
+
+  @override
   Future<void> play() async {
     await _get('/Play');
   }

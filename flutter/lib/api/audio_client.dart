@@ -65,6 +65,16 @@ abstract class AudioClient {
   /// Used to visualize which players are grouped together.
   Future<Map<String, List<String>>> getGroupInfo();
 
+  /// Get current playback URI and metadata for transfer.
+  /// [uri] is the abstract/service URI (for same-platform transfer).
+  /// [metadata] is the associated metadata (DIDL-Lite for Sonos, empty for BluOS).
+  /// [resolvedUri] is the actual stream URL (for cross-platform transfer).
+  /// Returns null if nothing is playing or transfer not possible.
+  Future<({String uri, String metadata, String? resolvedUri})?> getPlaybackInfo();
+
+  /// Start playback of given URI with metadata (for transfer).
+  Future<void> playUri(String uri, String metadata);
+
   /// Get debug information about API endpoints.
   String debugAPI();
 }

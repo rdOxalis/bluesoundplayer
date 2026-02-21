@@ -53,8 +53,10 @@ class SonosClient implements AudioClient {
           .timeout(timeout);
 
       if (response.statusCode != 200) {
+        final body = utf8.decode(response.bodyBytes);
+        print('[SOAP Error] Status ${response.statusCode} for $action: $body');
         throw AudioClientException(
-          'SOAP request failed with status ${response.statusCode}',
+          'SOAP $action failed (${response.statusCode})',
           statusCode: response.statusCode,
         );
       }
@@ -532,6 +534,82 @@ class SonosClient implements AudioClient {
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&apos;');
+  }
+
+  @override
+  Future<({String uri, String metadata, String? resolvedUri})?> getPlaybackInfo() async {
+    try {
+      // GetMediaInfo returns the abstract/service URI (e.g. x-sonosapi-stream:...)
+      final mediaXml = await _soap(
+        '/MediaRenderer/AVTransport/Control',
+        'AVTransport',
+        'GetMediaInfo',
+        '<InstanceID>0</InstanceID>',
+      );
+      final currentUri = _extractFromSoap(mediaXml, 'CurrentURI');
+      if (currentUri.isEmpty) return null;
+
+      // Filter out non-transferable URIs
+      if (currentUri.startsWith('x-rincon-queue:') ||
+          currentUri.startsWith('x-rincon:') ||
+          currentUri.startsWith('x-sonos-http:') ||
+          currentUri.startsWith('x-sonos-spotify:') ||
+          currentUri.startsWith('x-sonos-hls:')) {
+        print('[SonosClient.getPlaybackInfo] Non-transferable URI: $currentUri');
+        return null;
+      }
+
+      final currentMeta = _extractFromSoap(mediaXml, 'CurrentURIMetaData');
+
+      // GetPositionInfo returns the resolved/actual stream URL (e.g. aac://https://...)
+      String? resolvedUri;
+      try {
+        final positionXml = await _soap(
+          '/MediaRenderer/AVTransport/Control',
+          'AVTransport',
+          'GetPositionInfo',
+          '<InstanceID>0</InstanceID>',
+        );
+        final trackUri = _extractFromSoap(positionXml, 'TrackURI');
+        if (trackUri.isNotEmpty && trackUri != currentUri) {
+          resolvedUri = _cleanStreamUrl(trackUri);
+        }
+      } catch (_) {}
+
+      return (uri: currentUri, metadata: currentMeta, resolvedUri: resolvedUri);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Extract a plain HTTP(S) URL from a Sonos-resolved stream URI.
+  /// e.g. "aac://https://stream.example.com/file.aac" → "https://stream.example.com/file.aac"
+  String? _cleanStreamUrl(String uri) {
+    // Strip protocol prefixes like aac://, mp3://, flac://, ogg://
+    final match = RegExp(r'^(?:aac|mp3|flac|ogg|wma)://(https?://.+)$', caseSensitive: false).firstMatch(uri);
+    if (match != null) return match.group(1);
+
+    // Already a plain HTTP(S) URL
+    if (uri.startsWith('http://') || uri.startsWith('https://')) return uri;
+
+    return null;
+  }
+
+  @override
+  Future<void> playUri(String uri, String metadata) async {
+    final escapedUri = _escapeXml(uri);
+    final escapedMeta = metadata.isNotEmpty ? _escapeXml(metadata) : '';
+
+    await _soap(
+      '/MediaRenderer/AVTransport/Control',
+      'AVTransport',
+      'SetAVTransportURI',
+      '''<InstanceID>0</InstanceID>
+<CurrentURI>$escapedUri</CurrentURI>
+<CurrentURIMetaData>$escapedMeta</CurrentURIMetaData>''',
+    );
+
+    await play();
   }
 
   @override

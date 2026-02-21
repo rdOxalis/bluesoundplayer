@@ -9,17 +9,20 @@ class StatusState {
   final Status? status;
   final bool isLoading;
   final String? error;
+  final bool isTransferable;
 
   const StatusState({
     this.status,
     this.isLoading = false,
     this.error,
+    this.isTransferable = false,
   });
 
   StatusState copyWith({
     Status? status,
     bool? isLoading,
     String? error,
+    bool? isTransferable,
     bool clearError = false,
     bool clearStatus = false,
   }) {
@@ -27,6 +30,7 @@ class StatusState {
       status: clearStatus ? null : (status ?? this.status),
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
+      isTransferable: isTransferable ?? this.isTransferable,
     );
   }
 }
@@ -45,7 +49,8 @@ class StatusNotifier extends StateNotifier<StatusState> {
         : null;
 
     if (client == null) {
-      state = state.copyWith(clearStatus: true, clearError: true);
+      state = state.copyWith(
+          clearStatus: true, clearError: true, isTransferable: false);
       return;
     }
 
@@ -53,10 +58,22 @@ class StatusNotifier extends StateNotifier<StatusState> {
 
     try {
       final status = await client.getStatus();
-      state = state.copyWith(status: status, isLoading: false);
+
+      // Check if current content is transferable
+      bool transferable = false;
+      if (!status.isStopped) {
+        try {
+          final info = await client.getPlaybackInfo();
+          transferable = info != null;
+        } catch (_) {}
+      }
+
+      state = state.copyWith(
+          status: status, isLoading: false, isTransferable: transferable);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
+        isTransferable: false,
         error: 'Failed to get status: $e',
       );
     }
