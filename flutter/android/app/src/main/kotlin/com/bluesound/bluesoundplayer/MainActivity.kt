@@ -1,4 +1,4 @@
-package com.bluesound.bluesoundplayer_flutter
+package com.bluesound.bluesoundplayer
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,0 +1,1 @@
+Erstveröffentlichung mit vollständiger BluOS- und Sonos-Steuerung, Netzwerkerkennung, Presets, Gruppierung und Stream-Übergabe zwischen Playern.

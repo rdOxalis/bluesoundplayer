@@ -1,0 +1,15 @@
+BlueSound Controller lets you discover and control BluOS and Sonos audio players on your local network.
+
+Features:
+- Automatic network scanning to find all BluOS and Sonos players
+- Playback control: play, pause, stop, next, previous
+- Volume control with live updates
+- Access and play presets/favorites from your players
+- Switch between multiple players seamlessly
+- Transfer radio streams between players (Sonos↔Sonos, Sonos→BluOS, BluOS→BluOS)
+- Player grouping for multi-room audio
+- Multi-language support: English, German, Swahili
+- Light and dark theme
+- Auto-refresh of playback status
+
+No cloud account required. All communication stays on your local network.

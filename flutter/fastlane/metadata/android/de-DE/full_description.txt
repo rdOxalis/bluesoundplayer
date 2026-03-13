@@ -1,0 +1,15 @@
+BlueSound Controller ermöglicht die Erkennung und Steuerung von BluOS- und Sonos-Audioplayern im lokalen Netzwerk.
+
+Funktionen:
+- Automatisches Netzwerk-Scanning zum Auffinden aller BluOS- und Sonos-Player
+- Wiedergabesteuerung: Play, Pause, Stop, Vor, Zurück
+- Lautstärkeregelung mit Live-Updates
+- Zugriff auf Presets/Favoriten der Player
+- Nahtloses Umschalten zwischen mehreren Playern
+- Übergabe von Radio-Streams zwischen Playern (Sonos↔Sonos, Sonos→BluOS, BluOS→BluOS)
+- Player-Gruppierung für Multiroom-Audio
+- Mehrsprachig: Englisch, Deutsch, Swahili
+- Helles und dunkles Design
+- Automatische Aktualisierung des Wiedergabestatus
+
+Kein Cloud-Konto erforderlich. Die gesamte Kommunikation bleibt im lokalen Netzwerk.

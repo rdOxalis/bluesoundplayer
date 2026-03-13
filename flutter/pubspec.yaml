@@ -1,4 +1,4 @@
-name: bluesoundplayer_flutter
+name: bluesoundplayer
 description: "BluOS Multi-Room Audio Controller - Control BluOS and Sonos players"
 publish_to: 'none'
 version: 1.0.0+1

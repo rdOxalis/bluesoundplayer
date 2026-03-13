@@ -1,0 +1,1 @@
+Initial release with full BluOS and Sonos player control, network discovery, presets, grouping, and stream transfer between players.
