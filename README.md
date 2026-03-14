@@ -4,9 +4,9 @@ A Multi-Room audio controller with **interactive and non-interactive modes**, mu
 
 ## Download
 
-[<img src="https://raw.githubusercontent.com/nicehash/Etchereum/master/resources/get-it-on-github.png" alt="Get it on GitHub" height="80">](https://github.com/rdOxalis/bluesoundplayer/releases/latest)
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="80">](https://f-droid.org/packages/com.bluesound.bluesoundplayer)
-[<img src="https://flathub.org/api/badge?locale=en" alt="Get it on Flathub" height="80">](https://flathub.org/apps/io.github.rdoxalis.bluesoundplayer)
+[<img src="https://img.shields.io/badge/GitHub-Release-blue?style=for-the-badge&logo=github" alt="Get it on GitHub" height="50">](https://github.com/rdOxalis/bluesoundplayer/releases/latest)
+[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="50">](https://f-droid.org/packages/com.bluesound.bluesoundplayer)
+[<img src="https://flathub.org/api/badge?locale=en" alt="Get it on Flathub" height="50">](https://flathub.org/apps/io.github.rdoxalis.bluesoundplayer)
 
 > **Note:** F-Droid and Flathub listings are pending review.
 
