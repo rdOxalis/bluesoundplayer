@@ -1,0 +1,44 @@
+name: bluesound-controller
+version: 1.0.0
+summary: Control BluOS and Sonos multi-room audio players
+description: |
+  BlueSound Controller lets you discover and control BluOS and Sonos audio
+  players on your local network.
+
+  Features:
+  - Automatic network scanning for BluOS and Sonos players
+  - Playback control: play, pause, stop, next, previous
+  - Volume control with live updates
+  - Access and play presets/favorites
+  - Transfer radio streams between players
+  - Player grouping for multi-room audio
+  - Multi-language support (English, German, Swahili)
+  - Light and dark theme
+
+  No cloud account required. All communication stays on your local network.
+
+confinement: strict
+base: core22
+grade: stable
+
+slots:
+  dbus-bluesound-controller:
+    interface: dbus
+    bus: session
+    name: io.github.rdoxalis.bluesoundplayer
+
+apps:
+  bluesound-controller:
+    command: bluesoundplayer
+    extensions: [gnome]
+    plugs:
+      - network
+      - network-bind
+    slots:
+      - dbus-bluesound-controller
+
+parts:
+  bluesound-controller:
+    source: .
+    plugin: flutter
+    flutter-target: lib/main.dart
