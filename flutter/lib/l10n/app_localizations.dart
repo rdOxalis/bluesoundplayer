@@ -73,6 +73,10 @@ class AppLocalizations {
       'seconds': 'seconds',
       'about': 'About',
       'version': 'Version',
+      'licenses': 'Open Source Licenses',
+      'buyMeACoffee': 'Buy the developer a coffee',
+      'donationMessage': 'If you enjoy this app, you can support its development with a small donation. Thank you!',
+      'donate': 'Donate',
 
       // Actions
       'refresh': 'Refresh',
@@ -162,6 +166,10 @@ class AppLocalizations {
       'seconds': 'Sekunden',
       'about': 'Über',
       'version': 'Version',
+      'licenses': 'Open-Source-Lizenzen',
+      'buyMeACoffee': 'Dem Entwickler einen Kaffee kaufen',
+      'donationMessage': 'Wenn dir die App gefällt, kannst du die Entwicklung mit einer kleinen Spende unterstützen. Vielen Dank!',
+      'donate': 'Spenden',
 
       // Actions
       'refresh': 'Aktualisieren',
@@ -251,6 +259,10 @@ class AppLocalizations {
       'seconds': 'sekunde',
       'about': 'Kuhusu',
       'version': 'Toleo',
+      'licenses': 'Leseni za Open Source',
+      'buyMeACoffee': 'Mnunulie msanidi kahawa',
+      'donationMessage': 'Ikiwa unapenda programu hii, unaweza kusaidia maendeleo yake kwa mchango mdogo. Asante!',
+      'donate': 'Changia',
 
       // Actions
       'refresh': 'Sasisha',
@@ -347,6 +359,10 @@ class AppLocalizations {
   String get seconds => get('seconds');
   String get about => get('about');
   String get version => get('version');
+  String get licenses => get('licenses');
+  String get buyMeACoffee => get('buyMeACoffee');
+  String get donationMessage => get('donationMessage');
+  String get donate => get('donate');
 
   // Actions
   String get refresh => get('refresh');

@@ -9,8 +9,11 @@ F-Droid baut Apps selbst aus dem Quellcode. Es wird keine APK eingereicht,
 sondern eine YAML-Metadaten-Datei, die als Build-Anweisung dient.
 
 **Involvierte Repositories:**
-- `github.com/[USER]/bluesoundplayer` – das eigene App-Repo (Quellcode)
+- `github.com/rdOxalis/bluesoundplayer` – das eigene App-Repo (Quellcode)
 - `gitlab.com/fdroid/fdroiddata` – F-Droid's Metadaten-Repo (Merge Request Ziel)
+
+**Application ID:** `com.bluesound.bluesoundplayer`
+**GitLab-Account:** `ooocp` (https://gitlab.com/ooocp)
 
 ---
 
@@ -29,7 +32,7 @@ ls LICENSE*
 ```bash
 # In app/build.gradle oder app/build.gradle.kts
 grep -r "applicationId" app/build.gradle*
-# Beispiel-Ergebnis: applicationId "com.carl.bluesoundplayer"
+# Beispiel-Ergebnis: applicationId "com.bluesound.bluesoundplayer"
 # Diese ID wird der Name der YAML-Datei bei F-Droid
 ```
 
@@ -128,7 +131,7 @@ git push origin main
 ```bash
 # Im Browser: https://gitlab.com/fdroid/fdroiddata → "Fork"
 # Dann lokal klonen (shallow clone spart Bandbreite ~2 GB Build-Umgebung)
-git clone --depth=1 https://gitlab.com/DEIN_GITLAB_USER/fdroiddata ~/fdroiddata
+git clone --depth=1 https://gitlab.com/ooocp/fdroiddata ~/fdroiddata
 cd ~/fdroiddata
 ```
 
@@ -139,43 +142,55 @@ cd ~/fdroiddata
 ### 3.1 Neuen Branch anlegen
 ```bash
 cd ~/fdroiddata
-git checkout -b com.carl.bluesoundplayer
+git checkout -b com.bluesound.bluesoundplayer
 ```
 
 ### 3.2 YAML-Metadaten-Datei anlegen
 ```bash
 # Dateiname = applicationId aus build.gradle
-touch metadata/com.carl.bluesoundplayer.yml
+touch metadata/com.bluesound.bluesoundplayer.yml
 ```
 
-**Inhalt `metadata/com.carl.bluesoundplayer.yml`:**
+**Inhalt `metadata/com.bluesound.bluesoundplayer.yml`:**
 ```yaml
 Categories:
   - Multimedia
 
-License: GPL-3.0-or-later   # Anpassen an tatsächliche Lizenz
+License: MIT
 
-AuthorName: Carl
-AuthorEmail: deine@email.de  # Optional
+AuthorName: rdOxalis
 
-WebSite: https://github.com/DEIN_USER/bluesoundplayer
-SourceCode: https://github.com/DEIN_USER/bluesoundplayer
-IssueTracker: https://github.com/DEIN_USER/bluesoundplayer/issues
+WebSite: https://github.com/rdOxalis/bluesoundplayer
+SourceCode: https://github.com/rdOxalis/bluesoundplayer
+IssueTracker: https://github.com/rdOxalis/bluesoundplayer/issues
+
+Summary: Control BluOS and Sonos multi-room audio players
 
 RepoType: git
-Repo: https://github.com/DEIN_USER/bluesoundplayer
+Repo: https://github.com/rdOxalis/bluesoundplayer
 
 Builds:
-  - versionName: '1.0'
+  - versionName: '1.0.0'
     versionCode: 1
-    commit: v1.0          # Muss dem Git-Tag entsprechen
-    subdir: app           # Verzeichnis mit build.gradle
-    gradle:
-      - yes               # Standard Gradle-Build
+    commit: v1.0
+    subdir: flutter
+    output: build/app/outputs/flutter-apk/app-release.apk
+    srclibs:
+      - flutter@stable
+    rm:
+      - src
+      - release
+    prebuild:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get
+    build:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter build apk --release
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: '1.0'
+CurrentVersion: '1.0.0'
 CurrentVersionCode: 1
 ```
 
@@ -190,9 +205,7 @@ CurrentVersionCode: 1
 
 ### 4.1 fdroidserver installieren
 ```bash
-pip install fdroidserver
-# oder via apt:
-# sudo apt-get install fdroidserver
+pipx install fdroidserver
 ```
 
 ### 4.2 Metadaten-Syntax prüfen
@@ -208,7 +221,7 @@ fdroid readmeta
 # ANDROID_HOME setzen falls nötig
 export ANDROID_HOME=/path/to/android-sdk
 
-fdroid build com.carl.bluesoundplayer
+fdroid build com.bluesound.bluesoundplayer
 # Bei Erfolg: Build-Artefakt in ~/fdroiddata/unsigned/
 ```
 
@@ -219,14 +232,14 @@ fdroid build com.carl.bluesoundplayer
 ### 5.1 Committen und pushen
 ```bash
 cd ~/fdroiddata
-git add metadata/com.carl.bluesoundplayer.yml
+git add metadata/com.bluesound.bluesoundplayer.yml
 git commit -m "New App: BluesoundPlayer"
-git push origin com.carl.bluesoundplayer
+git push origin com.bluesound.bluesoundplayer
 ```
 
 ### 5.2 Merge Request auf GitLab erstellen
 - URL: `https://gitlab.com/fdroid/fdroiddata/-/merge_requests/new`
-- Source branch: `DEIN_GITLAB_USER/fdroiddata:com.carl.bluesoundplayer`
+- Source branch: `ooocp/fdroiddata:com.bluesound.bluesoundplayer`
 - Target branch: `fdroid/fdroiddata:master`
 - Titel: `New App: BluesoundPlayer`
 - Beschreibung: Kurze App-Beschreibung + Link zum GitHub-Repo
@@ -254,15 +267,32 @@ git push origin com.carl.bluesoundplayer
 
 ## Checkliste
 
-- [ ] `LICENSE`-Datei im Repo vorhanden
-- [ ] `applicationId` in `build.gradle` gesetzt
-- [ ] `versionName` und `versionCode` korrekt
-- [ ] Git-Tag `v1.0` gesetzt und gepusht
-- [ ] `fastlane/metadata/android/en-US/` Dateien angelegt
-- [ ] `dependenciesInfo` Block in `build.gradle` eingetragen
-- [ ] Keine proprietären Abhängigkeiten in Gradle-Dateien
-- [ ] GitLab-Account erstellt
-- [ ] `fdroiddata` geforkt und geklont
-- [ ] YAML-Datei `metadata/com.carl.bluesoundplayer.yml` angelegt
-- [ ] `fdroid readmeta` ohne Fehler
-- [ ] Merge Request eingereicht
+### Phase 1 – Repo vorbereiten ✅
+- [x] `LICENSE`-Datei im Repo vorhanden (MIT)
+- [x] `applicationId` = `com.bluesound.bluesoundplayer`
+- [x] `versionName` 1.0.0, `versionCode` 1
+- [x] Git-Tag `v1.0.0` gesetzt und gepusht
+- [x] `fastlane/metadata/android/en-US/` + `de-DE/` angelegt
+- [x] `dependenciesInfo` Block in `build.gradle`
+- [x] Keine proprietären Abhängigkeiten
+- [x] YAML-Datei validiert (`fdroid readmeta` + `fdroid rewritemeta` fehlerfrei)
+
+### Phase 2-5 – F-Droid Submission ✅
+- [x] GitLab-Account erstellt (`ooocp`)
+- [x] `fdroiddata` geforkt und geklont (`/home/ralf/40_opensource/gitlab/fdroiddata`)
+- [x] YAML-Datei `metadata/com.bluesound.bluesoundplayer.yml` in Fork committed
+- [x] Merge Request eingereicht: https://gitlab.com/fdroid/fdroiddata/-/merge_requests/34693
+
+### CI Pipeline Status (2026-03-13)
+- [x] schema validation
+- [x] check source code
+- [x] fdroid rewritemeta
+- [x] fdroid lint
+- [x] git redirect
+- [x] checkupdates
+- [ ] fdroid build – erwartet fehlgeschlagen (Flutter-Build nur auf F-Droid Servern)
+- [ ] tools check scripts – Folgefehler des Builds
+
+### Nächster Schritt
+- Auf Review/Feedback vom F-Droid-Team warten
+- Zeitnah auf MR-Kommentare antworten

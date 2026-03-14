@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/providers.dart';
@@ -132,10 +134,59 @@ class SettingsScreen extends ConsumerWidget {
               ),
         ),
         const SizedBox(height: 8),
+        FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snapshot) {
+            final version = snapshot.data?.version ?? '...';
+            final buildNumber = snapshot.data?.buildNumber ?? '';
+            return ListTile(
+              title: Text(l10n.appTitle),
+              subtitle: Text('${l10n.version} $version${buildNumber.isNotEmpty ? '+$buildNumber' : ''}'),
+              leading: const Icon(Icons.info_outline),
+            );
+          },
+        ),
         ListTile(
-          title: Text(l10n.appTitle),
-          subtitle: Text('${l10n.version} 1.0.0'),
-          leading: const Icon(Icons.info_outline),
+          title: Text(l10n.licenses),
+          leading: const Icon(Icons.description_outlined),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            showLicensePage(
+              context: context,
+              applicationName: l10n.appTitle,
+            );
+          },
+        ),
+        ListTile(
+          title: Text(l10n.buyMeACoffee),
+          leading: const Icon(Icons.coffee_outlined),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(l10n.buyMeACoffee),
+                content: Text(l10n.donationMessage),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+                  ),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.coffee),
+                    label: Text(l10n.donate),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      launchUrl(
+                        Uri.parse('https://paypal.me/CarlDarkman'),
+                        mode: LaunchMode.externalApplication,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ],
     );
