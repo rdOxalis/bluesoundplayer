@@ -2,7 +2,15 @@
 
 A Multi-Room audio controller with **interactive and non-interactive modes**, multi-language support, and automatic network scanning for BlueOS and Sonos devices.
 
-## Important Hint 
+## Download
+
+[<img src="https://raw.githubusercontent.com/nicehash/Etchereum/master/resources/get-it-on-github.png" alt="Get it on GitHub" height="80">](https://github.com/rdOxalis/bluesoundplayer/releases/latest)
+[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="80">](https://f-droid.org/packages/com.bluesound.bluesoundplayer)
+[<img src="https://flathub.org/api/badge?locale=en" alt="Get it on Flathub" height="80">](https://flathub.org/apps/io.github.rdoxalis.bluesoundplayer)
+
+> **Note:** F-Droid and Flathub listings are pending review.
+
+## Important Hint
 
 This application was co-authored by an AI. If you do not like that, do not clone or use.
 
@@ -20,23 +28,15 @@ This application was co-authored by an AI. If you do not like that, do not clone
 
 ### Desktop App (Flutter) — Linux
 
-Download `BlueSoundController-linux-x64.tar.gz` from the [Releases](release/) and install:
+Download `BlueSoundController-linux-x64.tar.gz` from the [latest release](https://github.com/rdOxalis/bluesoundplayer/releases/latest) and extract:
 
 ```bash
 tar xzf BlueSoundController-linux-x64.tar.gz
-cd BlueSoundController-linux-x64
-./install.sh
 ```
-
-No sudo required. Installs to `~/.local/` and creates:
-- **App menu entry:** "BlueSound Controller"
-- **Command:** `bluesound-controller`
-
-To uninstall: `~/.local/share/bluesound-controller/` entfernen oder `./uninstall.sh` im Flutter-Verzeichnis.
 
 ### Desktop App (Flutter) — Android
 
-Download `BlueSoundController.apk` from the [Releases](release/) and install on your Android device.
+Download `BlueSoundController.apk` from the [latest release](https://github.com/rdOxalis/bluesoundplayer/releases/latest) and install on your Android device.
 
 ### CLI — Build from Source
 
@@ -52,7 +52,7 @@ go build -o ../bluesoundplayer *.go
 
 ### CLI — Pre-built Binaries
 
-Download from [Releases](release/):
+Download from the [latest release](https://github.com/rdOxalis/bluesoundplayer/releases/latest):
 
 | Platform | Binary |
 |----------|--------|
