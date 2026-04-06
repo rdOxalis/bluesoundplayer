@@ -1,0 +1,55 @@
+Categories:
+  - Multimedia
+
+License: MIT
+
+AuthorName: rdOxalis
+AuthorWebSite: https://github.com/rdOxalis
+
+WebSite: https://github.com/rdOxalis/bluesoundplayer
+SourceCode: https://github.com/rdOxalis/bluesoundplayer
+IssueTracker: https://github.com/rdOxalis/bluesoundplayer/issues
+
+Summary: Control BluOS and Sonos multi-room audio players
+Description: |
+  BlueSound Controller lets you discover and control BluOS and Sonos audio
+  players on your local network.
+
+  Features:
+  * Automatic network scanning to find all BluOS and Sonos players
+  * Playback control: play, pause, stop, next, previous
+  * Volume control with live updates
+  * Access and play presets/favorites from your players
+  * Transfer radio streams between players
+  * Player grouping for multi-room audio
+  * Multi-language support (English, German, Swahili)
+  * Light and dark theme
+
+  No cloud account required. All communication stays on your local network.
+
+RepoType: git
+Repo: https://github.com/rdOxalis/bluesoundplayer
+
+Builds:
+  - versionName: '1.0.0'
+    versionCode: 1
+    commit: v1.0
+    subdir: flutter
+    output: build/app/outputs/flutter-apk/app-release.apk
+    srclibs:
+      - flutter@stable
+    rm:
+      - src
+      - release
+    prebuild:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter config --no-analytics
+      - $$flutter$$/bin/flutter pub get
+    build:
+      - export PUB_CACHE=$(pwd)/.pub-cache
+      - $$flutter$$/bin/flutter build apk --release
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '1.0.0'
+CurrentVersionCode: 1

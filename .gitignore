@@ -1,1 +1,7 @@
 CLAUDE.md
+
+# Snapcraft build artifacts
+parts/
+stage/
+prime/
+*.snap
