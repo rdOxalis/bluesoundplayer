@@ -62,6 +62,7 @@ Metadata file: `metadata/com.bluesound.bluesoundplayer.yml`
 - Run `fdroid rewritemeta com.bluesound.bluesoundplayer` before pushing
 - Include `IssueTracker`, `AuthorName`, `AuthorWebSite` — linsui explicitly requested these
 - Don't include `WebSite` (auto-derived from GitHub)
+- Field order matters for `rewritemeta`: `AuthorName`, `AuthorWebSite`, `SourceCode`, `IssueTracker`
 - Do include `SourceCode` (required even if same as Repo)
 - `scandelete` paths are relative to repo root, not to `subdir`
 - Install fdroidserver locally via `pipx install fdroidserver`
