@@ -1,0 +1,15 @@
+BlueSound Controller inakuwezesha kugundua na kudhibiti vichezaji vya sauti vya BluOS na Sonos kwenye mtandao wako wa ndani.
+
+Vipengele:
+- Utafutaji wa mtandao wa kiotomatiki kupata vichezaji vyote vya BluOS na Sonos
+- Udhibiti wa uchezaji: cheza, simama, acha, kipande kinachofuata, kilichotangulia
+- Udhibiti wa sauti kwa masasisho ya moja kwa moja
+- Fikia na cheza vipendwa/viwekwa awali kutoka kwa vichezaji vyako
+- Badilisha kati ya vichezaji vingi bila mshono
+- Hamisha mtiririko wa redio kati ya vichezaji (Sonos↔Sonos, Sonos→BluOS, BluOS→BluOS)
+- Kupanga vichezaji kwa sauti ya vyumba vingi
+- Msaada wa lugha nyingi: Kiingereza, Kijerumani, Kiswahili
+- Mandhari ya mwanga na giza
+- Usasishaji wa kiotomatiki wa hali ya uchezaji
+
+Hakuna akaunti ya wingu inayohitajika. Mawasiliano yote yanabaki kwenye mtandao wako wa ndani.
