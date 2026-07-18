@@ -72,15 +72,10 @@ class PresetsNotifier extends StateNotifier<PresetsState> {
     final client = _ref.read(playersProvider.notifier).currentClient;
     if (client == null) return;
 
-    try {
-      await client.playPreset(id);
-      // Refresh status after playing
-      await Future.delayed(const Duration(milliseconds: 500));
-      await _ref.read(statusProvider.notifier).refresh();
-    } catch (e) {
-      state = state.copyWith(error: 'Failed to play preset: $e');
-      rethrow;
-    }
+    await client.playPreset(id);
+    // Refresh status after playing
+    await Future.delayed(const Duration(milliseconds: 500));
+    await _ref.read(statusProvider.notifier).refresh();
   }
 }
 
