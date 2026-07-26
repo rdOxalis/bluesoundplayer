@@ -14,7 +14,8 @@ rm -rf "$HOME/.local/share/bluesoundplayer"
 # Remove bin symlink
 rm -f "$HOME/.local/bin/bluesound-controller"
 
-# Remove desktop entries (both old and new naming)
+# Remove desktop entries (old and new naming)
+rm -f "$HOME/.local/share/applications/com.bluesound.bluesoundplayer_flutter.desktop"
 rm -f "$HOME/.local/share/applications/bluesound-controller.desktop"
 rm -f "$HOME/.local/share/applications/bluesoundplayer.desktop"
 

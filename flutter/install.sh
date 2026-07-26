@@ -29,6 +29,12 @@ BIN_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"
 ICON_BASE="$HOME/.local/share/icons/hicolor"
 ICON_SRC="$SCRIPT_DIR/assets/icon/app_icon.png"
+# Must match APPLICATION_ID in linux/CMakeLists.txt: Wayland compositors
+# (e.g. KWin) resolve a running window's icon by matching its app_id against
+# a desktop file of the same name, not via gtk_window_set_icon_from_file
+# (X11-only). Keeping this in sync keeps the Alt+Tab/window-switcher icon
+# correct.
+APP_ID="com.bluesound.bluesoundplayer_flutter"
 
 echo "Installing BlueSound Controller..."
 
@@ -36,6 +42,7 @@ echo "Installing BlueSound Controller..."
 rm -rf "$INSTALL_DIR"
 rm -f "$BIN_DIR/bluesound-controller"
 rm -f "$DESKTOP_DIR/bluesound-controller.desktop"
+rm -f "$DESKTOP_DIR/$APP_ID.desktop"
 find "$HOME/.local/share/icons" -name "bluesound-controller.*" -delete 2>/dev/null || true
 
 # Copy app bundle
@@ -62,9 +69,10 @@ if [ -f "$ICON_SRC" ]; then
     gtk-update-icon-cache -f -t "$ICON_BASE" 2>/dev/null || true
 fi
 
-# Create .desktop file
+# Create .desktop file. Filename must equal the app_id for Wayland icon
+# matching (see APP_ID comment above).
 mkdir -p "$DESKTOP_DIR"
-cat > "$DESKTOP_DIR/bluesound-controller.desktop" << DESKTOP
+cat > "$DESKTOP_DIR/$APP_ID.desktop" << DESKTOP
 [Desktop Entry]
 Type=Application
 Name=BlueSound Controller
@@ -73,7 +81,7 @@ Exec=$INSTALL_DIR/bluesoundplayer_flutter
 Icon=bluesound-controller
 Terminal=false
 Categories=AudioVideo;Audio;Player;
-StartupWMClass=bluesoundplayer_flutter
+StartupWMClass=$APP_ID
 Keywords=audio;music;sonos;bluos;multiroom;speaker;
 DESKTOP
 
