@@ -1,0 +1,1 @@
+Adds an Open Source Licenses page and a developer support link in settings, shows the app version dynamically, and fixes a bug where a failed preset left a stuck error banner on screen.

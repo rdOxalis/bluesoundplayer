@@ -1,0 +1,1 @@
+Fügt eine Seite mit Open-Source-Lizenzen und einen Link zur Unterstützung des Entwicklers in den Einstellungen hinzu, zeigt die App-Version dynamisch an und behebt einen Fehler, bei dem nach einem fehlgeschlagenen Preset ein Fehlerbanner hängen blieb.
