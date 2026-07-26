@@ -776,13 +776,25 @@ class SonosClient implements AudioClient {
   /// Check if a string looks like a URL or stream filename.
   bool _looksLikeUrl(String s) {
     if (s.isEmpty) return false;
-    return s.startsWith('http://') ||
+    if (s.startsWith('http://') ||
         s.startsWith('https://') ||
         s.startsWith('x-') ||
         s.startsWith('aac://') ||
         s.startsWith('mms://') ||
         s.contains('stream.') ||
-        s.contains('?aggregator=');
+        s.contains('?aggregator=')) {
+      return true;
+    }
+    // General fallback: some streaming services report an opaque
+    // filename/query string as <dc:title> in a shape the prefix checks
+    // above don't cover (e.g. "regc-80s80ssoul...?sABC=...&amsparams=
+    // playerid:...;skey=..."). Real titles virtually always contain a
+    // space; a single long, space-free token full of query/tracking
+    // punctuation does not.
+    if (!s.contains(' ') && s.length > 20 && RegExp(r'[?&=#;]').hasMatch(s)) {
+      return true;
+    }
+    return false;
   }
 
   /// Find a favorite's name by matching its URI.
