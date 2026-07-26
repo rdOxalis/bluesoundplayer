@@ -1,0 +1,1 @@
+Fixes some radio stations showing a raw stream URL instead of the station name in Now Playing.

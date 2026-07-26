@@ -1,0 +1,1 @@
+Behebt einen Fehler, bei dem manche Radiosender in "Wird gespielt" eine rohe Stream-URL statt des Sendernamens anzeigten.
