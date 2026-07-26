@@ -305,9 +305,7 @@ func showPresetsCmd(client AudioClient, player *PlayerInfo) error {
 	if len(presets) == 0 {
 		fmt.Println("No presets/favorites found")
 	} else {
-		for _, preset := range presets {
-			fmt.Printf("[%d] %s\n", preset.ID, preset.Name)
-		}
+		PrintPresetsGrouped(presets, "")
 	}
 	fmt.Println(strings.Repeat("=", 70))
 	return nil

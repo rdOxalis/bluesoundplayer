@@ -33,6 +33,11 @@ var texts = map[Language]map[string]string{
 		"error_retrieving_status": "❌ Error retrieving status",
 		"available_presets":       "📋 Available Presets/Favorites:",
 		"error_loading_presets":   "❌ Error loading presets/favorites",
+		"category_station":        "📻 Stations:",
+		"category_playlist":       "📃 Playlists:",
+		"category_album":          "💿 Albums:",
+		"category_song":           "🎵 Songs:",
+		"presets_page":            "-- Page %d/%d (n = next, p = previous) --",
 		"available_commands":      "🎮 Available Commands:",
 		"cmd_play_preset":         "play <id>   - Play preset/favorite",
 		"cmd_play":                "play       - Start playback",
@@ -83,6 +88,7 @@ var texts = map[Language]map[string]string{
 		"invalid_group_format":    "❌ Invalid group format. Use: group <id1+id2>",
 		"error_grouping":          "❌ Error grouping players",
 		"group_combinations":      "🎵 Group Combinations:",
+		"no_group_combinations":   "No compatible players to group (need 2+ players of the same type).",
 		"ungrouped_all":           "🔓 All player groups removed",
 		"error_ungrouping":        "❌ Error removing groups",
 		"scanning_interfaces":     "🔍 Found %d network interfaces to scan",
@@ -108,6 +114,11 @@ var texts = map[Language]map[string]string{
 		"error_retrieving_status": "❌ Fehler beim Abrufen des Status",
 		"available_presets":       "📋 Verfügbare Presets/Favoriten:",
 		"error_loading_presets":   "❌ Fehler beim Laden der Presets/Favoriten",
+		"category_station":        "📻 Sender:",
+		"category_playlist":       "📃 Playlists:",
+		"category_album":          "💿 Alben:",
+		"category_song":           "🎵 Songs:",
+		"presets_page":            "-- Seite %d/%d (n = weiter, p = zurück) --",
 		"available_commands":      "🎮 Verfügbare Befehle:",
 		"cmd_play_preset":         "play <id>   - Preset/Favorit abspielen",
 		"cmd_play":                "play       - Wiedergabe starten",
@@ -158,6 +169,7 @@ var texts = map[Language]map[string]string{
 		"invalid_group_format":    "❌ Ungültiges Gruppen-Format. Verwende: group <id1+id2>",
 		"error_grouping":          "❌ Fehler beim Gruppieren",
 		"group_combinations":      "🎵 Gruppen-Kombinationen:",
+		"no_group_combinations":   "Keine kompatiblen Player zum Gruppieren (mind. 2 Player desselben Typs nötig).",
 		"ungrouped_all":           "🔓 Alle Player-Gruppen aufgelöst",
 		"error_ungrouping":        "❌ Fehler beim Auflösen der Gruppen",
 		"scanning_interfaces":     "🔍 %d Netzwerkschnittstellen gefunden zum Scannen",
@@ -183,6 +195,11 @@ var texts = map[Language]map[string]string{
 		"error_retrieving_status": "❌ Hitilafu katika kupata hali",
 		"available_presets":       "📋 Mipangilio/Vipendwa Vinavyopatikana:",
 		"error_loading_presets":   "❌ Hitilafu katika kupakia mipangilio/vipendwa",
+		"category_station":        "📻 Vituo:",
+		"category_playlist":       "📃 Orodha za Nyimbo:",
+		"category_album":          "💿 Albamu:",
+		"category_song":           "🎵 Nyimbo:",
+		"presets_page":            "-- Ukurasa %d/%d (n = mbele, p = nyuma) --",
 		"available_commands":      "🎮 Amri Zinazopatikana:",
 		"cmd_play_preset":         "play <id>   - Cheza mpangilio/kipendwa",
 		"cmd_play":                "play       - Anza kucheza",
@@ -233,6 +250,7 @@ var texts = map[Language]map[string]string{
 		"invalid_group_format":    "❌ Muundo wa kikundi si halali. Tumia: group <id1+id2>",
 		"error_grouping":          "❌ Hitilafu katika kuunganisha",
 		"group_combinations":      "🎵 Miunganiko ya Vikundi:",
+		"no_group_combinations":   "Hakuna vichezaji vinavyolingana kuunganishwa (vinahitajika vichezaji 2+ vya aina moja).",
 		"ungrouped_all":           "🔓 Vikundi vyote vya vichezaji vimeondolewa",
 		"error_ungrouping":        "❌ Hitilafu katika kuondoa vikundi",
 		"scanning_interfaces":     "🔍 Kumepatikana %d network interfaces za kutafuta",
@@ -250,4 +268,19 @@ func getText(key string) string {
 		return text
 	}
 	return key // Return key as fallback
+}
+
+// categoryLabel returns the localized, icon-prefixed header for a preset
+// category, used by PrintPresetsGrouped.
+func categoryLabel(cat PresetCategory) string {
+	switch cat {
+	case CategoryPlaylist:
+		return getText("category_playlist")
+	case CategoryAlbum:
+		return getText("category_album")
+	case CategorySong:
+		return getText("category_song")
+	default:
+		return getText("category_station")
+	}
 }

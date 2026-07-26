@@ -2,14 +2,29 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
+
+// dashboardCommands and groupsPageCommands list the commands shown in
+// their respective screens' footer, wrapped to the terminal width by
+// WrapCommandList instead of breaking at fixed points.
+var dashboardCommands = []string{
+	"play <id>", "play", "pause", "stop", "next", "prev", "vol <0-100>",
+	"output <id>", "group <id1+id2>", "ungroup", "g (groups)",
+	"lang <en|de|sw>", "quit",
+}
+
+var groupsPageCommands = []string{"group <id1+id2>", "ungroup", "g (back)", "quit"}
 
 // Global state for TUI
 type TUIState struct {
@@ -17,10 +32,26 @@ type TUIState struct {
 	playerName       string
 	status           *Status
 	presets          []Preset
+	presetsPage      int  // 0-indexed, see renderPresetsSection
+	showGroups       bool // true: render the group-combinations page instead of the dashboard
 	lastAction       string
 	statusError      string
 	presetsError     string
 	availablePlayers []PlayerInfo
+}
+
+// lineCountingWriter wraps a writer and counts newlines written through
+// it, so renderTUI can measure exactly how many terminal rows its fixed
+// sections (header/players/status, commands/footer) use before deciding
+// how many preset lines fit in what's left of the screen.
+type lineCountingWriter struct {
+	w     io.Writer
+	lines int
+}
+
+func (lw *lineCountingWriter) Write(p []byte) (int, error) {
+	lw.lines += bytes.Count(p, []byte("\n"))
+	return lw.w.Write(p)
 }
 
 var tuiState = &TUIState{}
@@ -28,6 +59,37 @@ var tuiState = &TUIState{}
 // Clear screen and move cursor to top
 func clearScreen() {
 	fmt.Print("\033[2J\033[H")
+}
+
+// enterAltScreen switches to the terminal's alternate screen buffer (the
+// same mechanism vim/less/htop use), so the dashboard redraws in place
+// without ever scrolling the shell's normal screen/scrollback, and
+// without leaving redraw history behind once the app exits.
+func enterAltScreen() {
+	fmt.Print("\033[?1049h")
+}
+
+// exitAltScreen restores the shell's normal screen buffer, revealing
+// whatever was on screen before enterAltScreen. Must be called before any
+// message meant to remain visible after the app exits (goodbye, fatal
+// errors), since text drawn while the alt screen is active disappears the
+// moment it's left.
+func exitAltScreen() {
+	fmt.Print("\033[?1049l")
+}
+
+// installExitHandler ensures the alternate screen buffer is left cleanly
+// even on Ctrl+C/SIGTERM - without this, an interrupted session would
+// leave the terminal stuck showing the last redrawn frame (or blank)
+// after the process is gone.
+func installExitHandler() {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		exitAltScreen()
+		os.Exit(0)
+	}()
 }
 
 // Update TUI state
@@ -51,13 +113,121 @@ func updatePresets() {
 		tuiState.presets = presets
 		tuiState.presetsError = ""
 	}
+	tuiState.presetsPage = 0
 }
 
-// Render the complete TUI
+// Render the complete TUI. The header/players/status section and the
+// commands/footer section are always shown in full; only the presets
+// section is paginated (via the "n"/"p" commands), sized to whatever
+// terminal rows are left after those fixed sections - see
+// renderPresetsSection. Group combinations have their own page (the "g"
+// command, see renderGroupsPage) instead of always occupying header space,
+// since that list grows quadratically with the number of players.
 func renderTUI() {
+	if tuiState.showGroups {
+		renderGroupsPage()
+		return
+	}
+
 	clearScreen()
 
+	// lw counts the rows the fixed top section (header/players/status)
+	// actually takes, since that varies with player count.
+	lw := &lineCountingWriter{w: os.Stdout}
+
 	// Header
+	fmt.Fprintln(lw, getText("title"))
+	fmt.Fprintln(lw, strings.Repeat("=", 70))
+	deviceTypeIndicator := ""
+	if tuiState.client != nil {
+		switch tuiState.client.GetDeviceType() {
+		case DeviceTypeBluOS:
+			deviceTypeIndicator = " [BluOS]"
+		case DeviceTypeSonos:
+			deviceTypeIndicator = " [Sonos]"
+		}
+	}
+	fmt.Fprintf(lw, "🔗 %s %s%s\n", getText("current_player"), tuiState.playerName, deviceTypeIndicator)
+	fmt.Fprintln(lw)
+
+	// Available Players Section
+	if len(tuiState.availablePlayers) > 1 {
+		fmt.Fprintln(lw, getText("available_outputs"))
+		for i, player := range tuiState.availablePlayers {
+			activeMarker := ""
+			if player.Name == tuiState.playerName {
+				activeMarker = " ✅"
+			}
+			typeIndicator := ""
+			switch player.Type {
+			case DeviceTypeBluOS:
+				typeIndicator = " [BluOS]"
+			case DeviceTypeSonos:
+				typeIndicator = " [Sonos]"
+			}
+			fmt.Fprintf(lw, "  [%d] %s (%s)%s%s\n", i+1, player.Name, player.IP, typeIndicator, activeMarker)
+		}
+		fmt.Fprintln(lw)
+	}
+
+	// Status Section
+	if tuiState.statusError != "" {
+		fmt.Fprintln(lw, tuiState.statusError)
+	} else if tuiState.status != nil {
+		volumeStr := getText("volume_unknown")
+		if tuiState.status.Volume >= 0 {
+			volumeStr = fmt.Sprintf("%d%%", tuiState.status.Volume)
+		}
+		fmt.Fprintf(lw, getText("status_volume")+"\n", tuiState.status.State, volumeStr)
+		if tuiState.status.Song != "" {
+			fmt.Fprintf(lw, "🎵 %s", tuiState.status.Song)
+			if tuiState.status.Artist != "" {
+				fmt.Fprintf(lw, " - %s", tuiState.status.Artist)
+			}
+			fmt.Fprintln(lw)
+		} else {
+			fmt.Fprintf(lw, "🎵 %s\n", getText("no_song_playing"))
+		}
+	}
+	fmt.Fprintln(lw)
+
+	// Commands/footer section is built (but not printed yet) so its exact
+	// row count is known before deciding how many preset lines fit.
+	commandWidth, ok := TerminalWidth()
+	if !ok {
+		commandWidth = 70
+	}
+	var footer bytes.Buffer
+	fmt.Fprintln(&footer, getText("available_commands"))
+	for _, line := range WrapCommandList(dashboardCommands, "  ", commandWidth) {
+		fmt.Fprintln(&footer, line)
+	}
+	fmt.Fprintln(&footer)
+	if tuiState.lastAction != "" {
+		fmt.Fprintf(&footer, "%s %s\n", getText("last_action"), tuiState.lastAction)
+		fmt.Fprintln(&footer)
+	}
+	footerLines := bytes.Count(footer.Bytes(), []byte("\n"))
+
+	// Presets Section
+	fmt.Println(getText("available_presets"))
+	if tuiState.presetsError != "" {
+		fmt.Println(tuiState.presetsError)
+	} else if tuiState.presets != nil {
+		renderPresetsSection(lw.lines, footerLines)
+	}
+	fmt.Println()
+
+	os.Stdout.Write(footer.Bytes())
+}
+
+// renderGroupsPage shows the grouping page (all valid master+slave
+// combinations for the currently discovered players), reached via the "g"
+// command. It's a separate page rather than part of the main dashboard
+// because the combination list grows quadratically with the player count.
+func renderGroupsPage() {
+	clearScreen()
+
 	fmt.Println(getText("title"))
 	fmt.Println(strings.Repeat("=", 70))
 	deviceTypeIndicator := ""
@@ -72,85 +242,90 @@ func renderTUI() {
 	fmt.Printf("🔗 %s %s%s\n", getText("current_player"), tuiState.playerName, deviceTypeIndicator)
 	fmt.Println()
 
-	// Available Players Section
-	if len(tuiState.availablePlayers) > 1 {
-		fmt.Println(getText("available_outputs"))
-		for i, player := range tuiState.availablePlayers {
-			activeMarker := ""
-			if player.Name == tuiState.playerName {
-				activeMarker = " ✅"
-			}
-			typeIndicator := ""
-			switch player.Type {
-			case DeviceTypeBluOS:
-				typeIndicator = " [BluOS]"
-			case DeviceTypeSonos:
-				typeIndicator = " [Sonos]"
-			}
-			fmt.Printf("  [%d] %s (%s)%s%s\n", i+1, player.Name, player.IP, typeIndicator, activeMarker)
-		}
-		fmt.Println()
-
-		// Show possible group combinations (only for compatible devices)
-		if len(tuiState.availablePlayers) > 1 {
-			fmt.Println(getText("group_combinations"))
-			for i, master := range tuiState.availablePlayers {
-				for j, slave := range tuiState.availablePlayers {
-					if i != j && master.Type == slave.Type {
-						fmt.Printf("  group %d+%d - %s + %s\n", i+1, j+1, master.Name, slave.Name)
-					}
-				}
+	fmt.Println(getText("group_combinations"))
+	printedAny := false
+	for i, master := range tuiState.availablePlayers {
+		for j, slave := range tuiState.availablePlayers {
+			if i != j && master.Type == slave.Type {
+				fmt.Printf("  group %d+%d - %s + %s\n", i+1, j+1, master.Name, slave.Name)
+				printedAny = true
 			}
 		}
-		fmt.Println()
 	}
-
-	// Status Section
-	if tuiState.statusError != "" {
-		fmt.Println(tuiState.statusError)
-	} else if tuiState.status != nil {
-		volumeStr := getText("volume_unknown")
-		if tuiState.status.Volume >= 0 {
-			volumeStr = fmt.Sprintf("%d%%", tuiState.status.Volume)
-		}
-		fmt.Printf(getText("status_volume")+"\n", tuiState.status.State, volumeStr)
-		if tuiState.status.Song != "" {
-			fmt.Printf("🎵 %s", tuiState.status.Song)
-			if tuiState.status.Artist != "" {
-				fmt.Printf(" - %s", tuiState.status.Artist)
-			}
-			fmt.Println()
-		} else {
-			fmt.Printf("🎵 %s\n", getText("no_song_playing"))
-		}
+	if !printedAny {
+		fmt.Println("  " + getText("no_group_combinations"))
 	}
 	fmt.Println()
 
-	// Presets Section
-	fmt.Println(getText("available_presets"))
-	if tuiState.presetsError != "" {
-		fmt.Println(tuiState.presetsError)
-	} else if tuiState.presets != nil {
-		for _, preset := range tuiState.presets {
-			fmt.Printf("  [%d] %s\n", preset.ID, preset.Name)
-		}
-	}
-	fmt.Println()
-
-	// Commands Section - Display in compact rows
 	fmt.Println(getText("available_commands"))
-	fmt.Println("  play <id> | play | pause | stop | next | prev | vol <0-100>")
-	fmt.Println("  output <id> | group <id1+id2> | ungroup | lang <en|de|sw> | quit")
+	groupsWidth, ok := TerminalWidth()
+	if !ok {
+		groupsWidth = 70
+	}
+	for _, line := range WrapCommandList(groupsPageCommands, "  ", groupsWidth) {
+		fmt.Println(line)
+	}
 	fmt.Println()
 
-	// Last Action
 	if tuiState.lastAction != "" {
 		fmt.Printf("%s %s\n", getText("last_action"), tuiState.lastAction)
 		fmt.Println()
 	}
+}
 
-	// Separator line
-	fmt.Println(strings.Repeat("=", 70))
+// renderPresetsSection prints one page of tuiState.presets, sized to fit
+// whatever terminal rows remain after the given number of already-used
+// header and footer rows (plus the prompt line printed after renderTUI
+// returns, and this section's own header/page-indicator lines). Falls
+// back to printing everything unpaginated when the terminal size can't be
+// determined (e.g. piped output).
+func renderPresetsSection(headerLines, footerLines int) {
+	allLines := BuildPresetLines(tuiState.presets, "  ")
+
+	height, ok := TerminalHeight()
+	if !ok {
+		for _, l := range allLines {
+			fmt.Println(l)
+		}
+		return
+	}
+
+	// Reserve: header section + footer section + this section's own
+	// "Available Presets" header (already printed by the caller) + the
+	// page indicator line shown below + the trailing blank line before
+	// the footer + the 3-row prompt box printed after renderTUI returns
+	// (see printPromptBox, whose last line prints without a trailing
+	// newline so filling the terminal exactly doesn't force a scroll).
+	const presetsSectionOwnLines = 3 // "Available Presets" header + page indicator + trailing blank line
+	const promptBoxLines = 3
+	available := height - headerLines - footerLines - presetsSectionOwnLines - promptBoxLines
+	if available < 1 {
+		available = 1
+	}
+
+	pageCount := (len(allLines) + available - 1) / available
+	if pageCount < 1 {
+		pageCount = 1
+	}
+	if tuiState.presetsPage >= pageCount {
+		tuiState.presetsPage = pageCount - 1
+	}
+	if tuiState.presetsPage < 0 {
+		tuiState.presetsPage = 0
+	}
+
+	start := tuiState.presetsPage * available
+	end := start + available
+	if end > len(allLines) {
+		end = len(allLines)
+	}
+	for _, l := range allLines[start:end] {
+		fmt.Println(l)
+	}
+
+	if pageCount > 1 {
+		fmt.Printf(getText("presets_page")+"\n", tuiState.presetsPage+1, pageCount)
+	}
 }
 
 // Player selection
@@ -379,6 +554,26 @@ func changeLanguage(lang string) {
 	}
 }
 
+// printPromptBox draws a bordered input line below the current screen -
+// styled after Claude Code's own CLI prompt - and leaves the cursor
+// positioned right after the "❯" glyph, ready for typing.
+func printPromptBox() {
+	width, ok := TerminalWidth()
+	if !ok {
+		width = 70
+	}
+	border := strings.Repeat("─", width)
+
+	fmt.Println(border)
+	fmt.Println() // reserved input row, filled in below
+	fmt.Print(border) // no trailing newline: this is the last row of the
+	// screen when the dashboard fills the terminal exactly, and a
+	// newline here would push the cursor past it, forcing the terminal
+	// to scroll by one and leave a wasted blank row at the bottom.
+	fmt.Print("\033[1A\r") // back up to the input row, column 1
+	fmt.Print("❯ ")
+}
+
 // Interactive loop
 func interactiveMode() {
 	reader := bufio.NewReader(os.Stdin)
@@ -389,7 +584,7 @@ func interactiveMode() {
 
 	for {
 		renderTUI()
-		fmt.Print(getText("prompt"))
+		printPromptBox()
 
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
@@ -487,6 +682,17 @@ func interactiveMode() {
 			updatePresets()
 			tuiState.lastAction = "Presets/Favorites refreshed"
 
+		case "n":
+			tuiState.presetsPage++
+
+		case "p":
+			if tuiState.presetsPage > 0 {
+				tuiState.presetsPage--
+			}
+
+		case "g":
+			tuiState.showGroups = !tuiState.showGroups
+
 		case "help":
 			tuiState.lastAction = "Help displayed above"
 
@@ -523,7 +729,7 @@ func interactiveMode() {
 			changeLanguage(parts[1])
 
 		case "quit", "exit":
-			clearScreen()
+			exitAltScreen()
 			fmt.Println(getText("goodbye"))
 			return
 
@@ -573,13 +779,19 @@ func main() {
 		return
 	}
 
-	// Interactive mode (original behavior)
+	// Interactive mode (original behavior). Enter the alternate screen
+	// buffer immediately so scanning/player-selection output and the
+	// dashboard all render in place without scrolling the shell.
+	installExitHandler()
+	enterAltScreen()
+
 	fmt.Println(getText("title"))
 	fmt.Println(strings.Repeat("=", 70))
 
 	// Select player
 	client, playerName, availablePlayers, err := selectPlayer()
 	if err != nil {
+		exitAltScreen()
 		log.Fatalf(getText("error_selecting_player"), err)
 	}
 

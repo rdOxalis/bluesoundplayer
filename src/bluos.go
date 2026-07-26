@@ -64,7 +64,23 @@ func (bc *BluesoundClient) GetPresets() ([]Preset, error) {
 		return nil, fmt.Errorf("failed to parse presets XML: %w", err)
 	}
 
+	for i := range presets.Presets {
+		presets.Presets[i].Category = categorizeBluOSPreset(presets.Presets[i].URL)
+	}
+
 	return presets.Presets, nil
+}
+
+// categorizeBluOSPreset mirrors the Flutter app's _categorizePreset so both
+// apps group BluOS presets the same way: presets backed by a streaming
+// service ("/load?service=...", e.g. a saved Spotify/TuneIn playlist) are
+// shown as playlists, everything else (internet radio stations, AirPlay,
+// etc.) as stations.
+func categorizeBluOSPreset(url string) PresetCategory {
+	if strings.HasPrefix(strings.ToLower(url), "/load?service=") {
+		return CategoryPlaylist
+	}
+	return CategoryStation
 }
 
 func (bc *BluesoundClient) GetStatus() (*Status, error) {

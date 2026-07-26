@@ -29,6 +29,7 @@ type SonosBody struct {
 type SonosGetPositionInfoBody struct {
 	XMLName       xml.Name `xml:"GetPositionInfoResponse"`
 	Track         string   `xml:"Track"`
+	TrackURI      string   `xml:"TrackURI"`
 	TrackMetaData string   `xml:"TrackMetaData"`
 }
 
@@ -49,10 +50,12 @@ type SonosBrowseBody struct {
 
 // Sonos favorite item structure
 type SonosFavorite struct {
-	ID   int
-	Name string
-	URI  string
-	Meta string
+	ID          int
+	Name        string
+	URI         string
+	Meta        string
+	Category    PresetCategory
+	IsContainer bool // playlists/albums: needs queue-based playback, see playContainer
 }
 
 // Sonos API Client
@@ -60,6 +63,7 @@ type SonosClient struct {
 	baseURL   string
 	client    *http.Client
 	favorites []SonosFavorite
+	uuid      string // cached RINCON UUID, see deviceUUID()
 }
 
 func NewSonosClient(ip string) *SonosClient {
@@ -111,68 +115,65 @@ func (sc *SonosClient) loadFavorites() error {
 	// Force clear cache to reload
 	sc.favorites = nil
 
-	// First, try to get Sonos Radio favorites (R:0/0)
-	radioFavorites := sc.browseSonosRadioStations()
+	favorites := sc.browseFavorites()
 
-	if len(radioFavorites) > 0 {
-		sc.favorites = radioFavorites
+	if len(favorites) > 0 {
+		sc.favorites = favorites
 		return nil
 	}
 
-	// If no radio favorites found, create informative entry
+	// If no favorites found, create informative entry
 	sc.favorites = []SonosFavorite{
-		{ID: 1, Name: "[INFO] No Sonos Radio favorites found", URI: "", Meta: ""},
-		{ID: 2, Name: "[INFO] Add radio stations in the Sonos app", URI: "", Meta: ""},
+		{ID: 1, Name: "[INFO] No Sonos favorites found", Category: CategoryStation},
+		{ID: 2, Name: "[INFO] Add favorites in the Sonos app", Category: CategoryStation},
 	}
 
 	return nil
 }
 
-func (sc *SonosClient) browseSonosRadioStations() []SonosFavorite {
-	var allRadioFavorites []SonosFavorite
+// browseFavorites browses all known favorite/library containers and merges
+// the results into a single deduplicated, categorized list (radio
+// stations, playlists, albums, songs). Category filtering itself happens
+// per-item in parseFavoritesFromResponse via categorizeFavorite.
+func (sc *SonosClient) browseFavorites() []SonosFavorite {
+	var allFavorites []SonosFavorite
 
-	// Try different ObjectIDs for Sonos Radio stations
-	radioObjectIDs := []struct {
-		id   string
-		name string
-	}{
-		{"R:0/0", "Sonos Radio"},
-		{"R:0/1", "Radio Stations"},
-		{"FV:2", "Favorites"}, // Sometimes radio stations are in general favorites
-		{"A:RADIO", "Radio"},
-		{"SQ:", "Sonos Favorites"},
+	// Try different ObjectIDs for Sonos favorites/library content
+	objectIDs := []string{
+		"R:0/0",   // Sonos Radio
+		"R:0/1",   // Radio Stations
+		"FV:2",    // Sonos Favorites (radio, playlists, albums, songs)
+		"A:RADIO", // Radio
+		"SQ:",     // Sonos Playlists
 	}
 
-	for _, obj := range radioObjectIDs {
-		favorites := sc.browseForRadioContent(obj.id)
+	for _, objectID := range objectIDs {
+		favorites := sc.browseContainer(objectID)
 
-		// Filter to only include radio stations
 		for _, fav := range favorites {
-			if sc.isRadioStation(fav) {
-				// Check if not already in the list
-				isDuplicate := false
-				for _, existing := range allRadioFavorites {
-					if existing.URI == fav.URI || existing.Name == fav.Name {
-						isDuplicate = true
-						break
-					}
+			// Check if not already in the list
+			isDuplicate := false
+			for _, existing := range allFavorites {
+				if existing.URI == fav.URI || existing.Name == fav.Name {
+					isDuplicate = true
+					break
 				}
-				if !isDuplicate {
-					allRadioFavorites = append(allRadioFavorites, fav)
-				}
+			}
+			if !isDuplicate {
+				allFavorites = append(allFavorites, fav)
 			}
 		}
 	}
 
 	// Re-number the favorites
-	for i := range allRadioFavorites {
-		allRadioFavorites[i].ID = i + 1
+	for i := range allFavorites {
+		allFavorites[i].ID = i + 1
 	}
 
-	return allRadioFavorites
+	return allFavorites
 }
 
-func (sc *SonosClient) browseForRadioContent(objectID string) []SonosFavorite {
+func (sc *SonosClient) browseContainer(objectID string) []SonosFavorite {
 	body := fmt.Sprintf(`<u:Browse xmlns:u="urn:schemas-upnp-org:service:ContentDirectory:1">
 		<ObjectID>%s</ObjectID>
 		<BrowseFlag>BrowseDirectChildren</BrowseFlag>
@@ -216,49 +217,64 @@ func (sc *SonosClient) browseForRadioContent(objectID string) []SonosFavorite {
 	return sc.parseFavoritesFromResponse(string(data))
 }
 
-func (sc *SonosClient) isRadioStation(fav SonosFavorite) bool {
-	// Check URI patterns that indicate radio stations
-	radioPatterns := []string{
-		"x-sonosapi-stream:",
-		"x-sonosapi-radio:",
-		"x-rincon-mp3radio:",
-		"http://", // Many radio stations use direct HTTP streams
-		"https://",
-		"mms://",
-		"rtsp://",
-		"x-sonos-http:",
+// categorizeFavorite maps a Sonos DIDL-Lite upnp:class and URI to a preset
+// category, mirroring the Flutter app's _categorize() so both apps show
+// the same favorites in the same buckets. ok is false for types that
+// shouldn't be shown at all (e.g. meta-container "album list" nodes).
+func categorizeFavorite(upnpClass, uri string) (category PresetCategory, ok bool) {
+	cls := strings.ToLower(upnpClass)
+	lowerURI := strings.ToLower(uri)
+
+	// Album lists (meta-containers, not directly playable)
+	if strings.Contains(cls, "albumlist") {
+		return "", false
 	}
 
-	for _, pattern := range radioPatterns {
-		if strings.HasPrefix(fav.URI, pattern) {
-			return true
+	// Radio / audio broadcast
+	if strings.Contains(cls, "audiobroadcast") || strings.Contains(cls, "radio") {
+		return CategoryStation, true
+	}
+	// Music track / generic audio item
+	if strings.Contains(cls, "musictrack") || (strings.Contains(cls, "audioitem") && !strings.Contains(cls, "broadcast")) {
+		if strings.Contains(lowerURI, "x-sonosapi-stream:") ||
+			strings.Contains(lowerURI, "x-sonosapi-radio:") ||
+			strings.Contains(lowerURI, "x-rincon-mp3radio:") {
+			return CategoryStation, true
+		}
+		if strings.Contains(cls, "musictrack") {
+			return CategorySong, true
 		}
 	}
-
-	// Check metadata for radio-related classes
-	if strings.Contains(fav.Meta, "object.item.audioItem.audioBroadcast") ||
-		strings.Contains(fav.Meta, "object.item.audioItem.radio") ||
-		strings.Contains(fav.Meta, "radioBroadcast") {
-		return true
+	// Album
+	if strings.Contains(cls, "musicalbum") || strings.Contains(cls, "album") {
+		return CategoryAlbum, true
+	}
+	// Playlist container
+	if strings.Contains(cls, "playlistcontainer") || strings.Contains(cls, "playlist") {
+		return CategoryPlaylist, true
+	}
+	// StorageFolder or generic container → playlist
+	if strings.Contains(cls, "container") || strings.Contains(cls, "storagefolder") {
+		return CategoryPlaylist, true
 	}
 
-	// Check if the name suggests it's a radio station
-	radioNamePatterns := []string{
-		"Radio",
-		"FM",
-		"AM",
-		"Stream",
-		"Live",
+	// URI-based fallback for items without a clear class
+	switch {
+	case strings.Contains(lowerURI, "x-sonosapi-stream:"),
+		strings.Contains(lowerURI, "x-sonosapi-radio:"),
+		strings.Contains(lowerURI, "x-rincon-mp3radio:"),
+		strings.Contains(lowerURI, "mms://"),
+		strings.Contains(lowerURI, "rtsp://"):
+		return CategoryStation, true
+	case strings.Contains(lowerURI, "x-sonosapi-hls:"),
+		strings.Contains(lowerURI, "x-sonos-spotify:"),
+		strings.Contains(lowerURI, "x-sonos-http:"):
+		return CategoryPlaylist, true
+	case strings.HasPrefix(lowerURI, "http://"), strings.HasPrefix(lowerURI, "https://"):
+		return CategoryStation, true
 	}
 
-	nameLower := strings.ToLower(fav.Name)
-	for _, pattern := range radioNamePatterns {
-		if strings.Contains(nameLower, strings.ToLower(pattern)) {
-			return true
-		}
-	}
-
-	return false
+	return "", false
 }
 
 func (sc *SonosClient) parseFavoritesFromResponse(xmlResponse string) []SonosFavorite {
@@ -275,37 +291,62 @@ func (sc *SonosClient) parseFavoritesFromResponse(xmlResponse string) []SonosFav
 	// Decode the DIDL-Lite content
 	didlContent := html.UnescapeString(resultMatch[1])
 
-	// Parse items from DIDL-Lite - capture the full item element
-	// Use (?s) flag to make . match newlines
-	itemRegex := regexp.MustCompile(`(?s)(<item[^>]*>.*?</item>)`)
+	// Parse both <item> (stations, songs) and <container> (playlists,
+	// albums) elements from DIDL-Lite - capture the full element.
+	// Use (?s) flag to make . match newlines.
+	elementRegex := regexp.MustCompile(`(?s)<(item|container)\b[^>]*>.*?</(?:item|container)>`)
 	titleRegex := regexp.MustCompile(`<dc:title[^>]*>(.*?)</dc:title>`)
 	resRegex := regexp.MustCompile(`<res[^>]*>(.*?)</res>`)
+	classRegex := regexp.MustCompile(`<upnp:class[^>]*>(.*?)</upnp:class>`)
+	idAttrRegex := regexp.MustCompile(`\bid="([^"]*)"`)
 
-	items := itemRegex.FindAllStringSubmatch(didlContent, -1)
+	elements := elementRegex.FindAllString(didlContent, -1)
 
-	for i, item := range items {
-		if len(item) > 1 {
-			fullItemXml := item[1]
+	for _, el := range elements {
+		isContainerTag := strings.HasPrefix(el, "<container")
 
-			var title, uri string
+		var title, uri, class, itemID string
 
-			if titleMatch := titleRegex.FindStringSubmatch(fullItemXml); len(titleMatch) > 1 {
-				title = html.UnescapeString(titleMatch[1])
-			}
-
-			if resMatch := resRegex.FindStringSubmatch(fullItemXml); len(resMatch) > 1 {
-				uri = html.UnescapeString(resMatch[1])
-			}
-
-			if title != "" {
-				favorites = append(favorites, SonosFavorite{
-					ID:   i + 1,
-					Name: strings.TrimSpace(title),
-					URI:  uri,
-					Meta: fullItemXml, // Store full item XML for use in SetAVTransportURI
-				})
-			}
+		if m := titleRegex.FindStringSubmatch(el); len(m) > 1 {
+			title = html.UnescapeString(m[1])
 		}
+		if m := resRegex.FindStringSubmatch(el); len(m) > 1 {
+			uri = html.UnescapeString(m[1])
+		}
+		if m := classRegex.FindStringSubmatch(el); len(m) > 1 {
+			class = m[1]
+		}
+		if m := idAttrRegex.FindStringSubmatch(el); len(m) > 1 {
+			itemID = m[1]
+		}
+
+		if title == "" {
+			continue
+		}
+
+		category, ok := categorizeFavorite(class, uri)
+		if !ok {
+			continue
+		}
+
+		isContainer := isContainerTag ||
+			strings.Contains(strings.ToLower(class), "container") ||
+			strings.Contains(strings.ToLower(class), "album")
+
+		// Items without a <res> URI (browse-only container references)
+		// always need queue-based playback.
+		if uri == "" && itemID != "" {
+			uri = "x-rincon-cpcontainer:" + itemID
+			isContainer = true
+		}
+
+		favorites = append(favorites, SonosFavorite{
+			Name:        strings.TrimSpace(title),
+			URI:         uri,
+			Meta:        el, // Store full element XML for use in SetAVTransportURI/AddURIToQueue
+			Category:    category,
+			IsContainer: isContainer,
+		})
 	}
 
 	return favorites
@@ -319,9 +360,10 @@ func (sc *SonosClient) GetPresets() ([]Preset, error) {
 	var presets []Preset
 	for _, fav := range sc.favorites {
 		presets = append(presets, Preset{
-			ID:   fav.ID,
-			Name: fav.Name,
-			URL:  fav.URI,
+			ID:       fav.ID,
+			Name:     fav.Name,
+			URL:      fav.URI,
+			Category: fav.Category,
 		})
 	}
 
@@ -388,7 +430,29 @@ func (sc *SonosClient) GetStatus() (*Status, error) {
 
 	// Parse track metadata to extract song, artist, album
 	metadata := positionResponse.Body.GetPositionInfo.TrackMetaData
-	song, artist, album := parseSonosMetadata(metadata)
+	song, artist, album, streamContent := parseSonosMetadata(metadata)
+
+	// For radio streams, <r:streamContent> carries the current program
+	// info; use it as artist when the metadata itself has none.
+	if streamContent != "" && artist == "" {
+		artist = streamContent
+	}
+
+	// Some services (e.g. TuneIn via aggregator) report the raw stream
+	// URI as <dc:title> until real ICY metadata arrives - replace it with
+	// the matching favorite's name (if known), or the stream's program
+	// info, rather than showing a URL as the "song".
+	if looksLikeStreamURI(song) {
+		trackURI := positionResponse.Body.GetPositionInfo.TrackURI
+		if favName := sc.findFavoriteNameByURI(trackURI); favName != "" {
+			song = favName
+		} else if streamContent != "" {
+			song = streamContent
+			artist = "" // avoid showing streamContent twice
+		} else {
+			song = ""
+		}
+	}
 
 	// Get volume
 	volumeBody := `<u:GetVolume xmlns:u="urn:schemas-upnp-org:service:RenderingControl:1">
@@ -414,10 +478,14 @@ func (sc *SonosClient) GetStatus() (*Status, error) {
 	}, nil
 }
 
-func parseSonosMetadata(metadata string) (song, artist, album string) {
+func parseSonosMetadata(metadata string) (song, artist, album, streamContent string) {
 	titleRegex := regexp.MustCompile(`<dc:title[^>]*>(.*?)</dc:title>`)
 	creatorRegex := regexp.MustCompile(`<dc:creator[^>]*>(.*?)</dc:creator>`)
 	albumRegex := regexp.MustCompile(`<upnp:album[^>]*>(.*?)</upnp:album>`)
+	// <r:streamContent> carries the current program info for radio
+	// streams (e.g. artist - title), separate from the static station
+	// <dc:title>.
+	streamContentRegex := regexp.MustCompile(`<r:streamContent[^>]*>(.*?)</r:streamContent>`)
 
 	if match := titleRegex.FindStringSubmatch(metadata); len(match) > 1 {
 		song = html.UnescapeString(match[1])
@@ -428,8 +496,54 @@ func parseSonosMetadata(metadata string) (song, artist, album string) {
 	if match := albumRegex.FindStringSubmatch(metadata); len(match) > 1 {
 		album = html.UnescapeString(match[1])
 	}
+	if match := streamContentRegex.FindStringSubmatch(metadata); len(match) > 1 {
+		streamContent = html.UnescapeString(match[1])
+	}
 
-	return song, artist, album
+	return song, artist, album, streamContent
+}
+
+// looksLikeStreamURI reports whether s is a raw stream URI/filename
+// rather than a real title - some radio services (e.g. TuneIn via
+// aggregator services) report the stream URL itself as <dc:title> until
+// the station's actual ICY metadata arrives.
+func looksLikeStreamURI(s string) bool {
+	if s == "" {
+		return false
+	}
+	if strings.HasPrefix(s, "http://") ||
+		strings.HasPrefix(s, "https://") ||
+		strings.HasPrefix(s, "x-") ||
+		strings.HasPrefix(s, "aac://") ||
+		strings.HasPrefix(s, "mms://") ||
+		strings.Contains(s, "stream.") ||
+		strings.Contains(s, "?aggregator=") {
+		return true
+	}
+	// General fallback: some streaming services report an opaque
+	// filename/query string as <dc:title> in a shape the prefix checks
+	// above don't cover (e.g. "regc-80s80ssoul...?sABC=...&amsparams=
+	// playerid:...;skey=..."). Real titles virtually always contain a
+	// space; a single long, space-free token full of query/tracking
+	// punctuation does not.
+	if !strings.Contains(s, " ") && len(s) > 20 && strings.ContainsAny(s, "?&=#;") {
+		return true
+	}
+	return false
+}
+
+// findFavoriteNameByURI returns the cached favorite's name matching uri,
+// or "" if no favorites are loaded yet or none match.
+func (sc *SonosClient) findFavoriteNameByURI(uri string) string {
+	if uri == "" {
+		return ""
+	}
+	for _, fav := range sc.favorites {
+		if fav.URI == uri {
+			return fav.Name
+		}
+	}
+	return ""
 }
 
 func (sc *SonosClient) PlayPreset(id int) error {
@@ -459,6 +573,17 @@ func (sc *SonosClient) PlayPreset(id int) error {
 		return fmt.Errorf("no URI available for this favorite")
 	}
 
+	// Container types (playlists, albums) need queue-based playback.
+	// Direct URIs (stations, songs) use SetAVTransportURI.
+	if favorite.IsContainer {
+		return sc.playContainer(favorite)
+	}
+	return sc.playItem(favorite)
+}
+
+// playItem plays a directly-playable favorite (radio stations, songs) via
+// SetAVTransportURI.
+func (sc *SonosClient) playItem(favorite *SonosFavorite) error {
 	// Extract r:resMD from the item metadata if present - this contains the proper playback metadata
 	var metadata string
 	resMDRegex := regexp.MustCompile(`<r:resMD>(.*?)</r:resMD>`)
@@ -490,6 +615,79 @@ func (sc *SonosClient) PlayPreset(id int) error {
 
 	// Start playback
 	return sc.Play()
+}
+
+// playContainer plays a playlist/album favorite by replacing the queue
+// with its contents and switching transport to the queue - a direct
+// SetAVTransportURI to a container URI does not start playback, unlike
+// stations/songs handled by playItem.
+func (sc *SonosClient) playContainer(favorite *SonosFavorite) error {
+	var metadata string
+	if favorite.Meta != "" {
+		fullDidl := fmt.Sprintf(`<DIDL-Lite xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/" xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/">%s</DIDL-Lite>`, favorite.Meta)
+		metadata = escapeXmlForSoap(fullDidl)
+	}
+
+	// 1. Clear queue
+	if _, err := sc.makeSoapRequest("RemoveAllTracksFromQueue", "AVTransport",
+		`<u:RemoveAllTracksFromQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:RemoveAllTracksFromQueue>`); err != nil {
+		return fmt.Errorf("RemoveAllTracksFromQueue failed: %w", err)
+	}
+
+	// 2. Add container to queue
+	addBody := fmt.Sprintf(`<u:AddURIToQueue xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+		<InstanceID>0</InstanceID>
+		<EnqueuedURI>%s</EnqueuedURI>
+		<EnqueuedURIMetaData>%s</EnqueuedURIMetaData>
+		<DesiredFirstTrackNumberEnqueued>0</DesiredFirstTrackNumberEnqueued>
+		<EnqueueAsNext>1</EnqueueAsNext>
+	</u:AddURIToQueue>`, html.EscapeString(favorite.URI), metadata)
+	if _, err := sc.makeSoapRequest("AddURIToQueue", "AVTransport", addBody); err != nil {
+		return fmt.Errorf("AddURIToQueue failed: %w", err)
+	}
+
+	// 3. Switch transport to the queue
+	if uuid, err := sc.deviceUUID(); err == nil && uuid != "" {
+		queueBody := fmt.Sprintf(`<u:SetAVTransportURI xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">
+			<InstanceID>0</InstanceID>
+			<CurrentURI>x-rincon-queue:%s#0</CurrentURI>
+			<CurrentURIMetaData></CurrentURIMetaData>
+		</u:SetAVTransportURI>`, uuid)
+		if _, err := sc.makeSoapRequest("SetAVTransportURI", "AVTransport", queueBody); err != nil {
+			return fmt.Errorf("SetAVTransportURI (queue) failed: %w", err)
+		}
+	}
+
+	// 4. Play
+	return sc.Play()
+}
+
+// deviceUUID returns this player's RINCON UUID, needed to address its own
+// queue as a playback source (x-rincon-queue:<uuid>#0).
+func (sc *SonosClient) deviceUUID() (string, error) {
+	if sc.uuid != "" {
+		return sc.uuid, nil
+	}
+
+	resp, err := sc.client.Get(sc.baseURL + "/xml/device_description.xml")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	udnRegex := regexp.MustCompile(`<UDN>uuid:(RINCON_[A-Za-z0-9]+)</UDN>`)
+	match := udnRegex.FindSubmatch(body)
+	if len(match) < 2 {
+		return "", fmt.Errorf("UDN not found in device description")
+	}
+
+	sc.uuid = string(match[1])
+	return sc.uuid, nil
 }
 
 func (sc *SonosClient) Play() error {
