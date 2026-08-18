@@ -1,6 +1,9 @@
 # 🎵 Multi-Room Preset Player for Bluesound and Sonos Devices
 
 A Multi-Room audio controller with **interactive and non-interactive modes**, multi-language support, and automatic network scanning for BlueOS and Sonos devices.
+It comes in different disguises: 
+- Command Line (Linux, Windows, MacOs, Pi, interactive and command based so you can use it for Home Automation etc.) 
+- Android App (find the apk here and sideload it)
 
 ## Download
 
