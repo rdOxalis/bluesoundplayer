@@ -46,6 +46,7 @@ class PlayersState {
 class PlayersNotifier extends StateNotifier<PlayersState> {
   final NetworkScanner _scanner;
   AudioClient? _currentClient;
+  final Map<String, AudioClient> _clients = {};
 
   PlayersNotifier({NetworkScanner? scanner})
       : _scanner = scanner ?? NetworkScanner(),
@@ -98,8 +99,18 @@ class PlayersNotifier extends StateNotifier<PlayersState> {
 
   /// Select a player to control.
   void selectPlayer(PlayerInfo player) {
-    _currentClient = _createClient(player);
+    _currentClient = clientFor(player);
     state = state.copyWith(selectedPlayer: player);
+  }
+
+  /// Get (and cache) a client for any player, not just the selected one.
+  ///
+  /// Needed to control grouped players individually.
+  AudioClient clientFor(PlayerInfo player) {
+    return _clients.putIfAbsent(
+      '${player.type.name}:${player.ip}',
+      () => _createClient(player),
+    );
   }
 
   /// Create the appropriate client for a player.

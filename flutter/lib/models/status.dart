@@ -4,7 +4,7 @@ class Status {
   final String song;
   final String artist;
   final String album;
-  final int volume; // 0-100, -1 = N/A (e.g., grouped slave)
+  final int volume; // 0-100 (always this player's own level), -1 = N/A
 
   const Status({
     required this.state,
@@ -56,6 +56,20 @@ class Status {
         return state;
     }
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Status &&
+          runtimeType == other.runtimeType &&
+          state == other.state &&
+          song == other.song &&
+          artist == other.artist &&
+          album == other.album &&
+          volume == other.volume;
+
+  @override
+  int get hashCode => Object.hash(state, song, artist, album, volume);
 
   @override
   String toString() =>

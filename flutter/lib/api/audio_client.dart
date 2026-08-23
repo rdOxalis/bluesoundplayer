@@ -40,6 +40,12 @@ abstract class AudioClient {
   /// Throws [ArgumentError] if level is not in range 0-100.
   Future<void> setVolume(int level);
 
+  /// Get this player's own volume level (0-100), or -1 if unavailable.
+  ///
+  /// Always reports the individual player volume, never a group volume,
+  /// so each member of a group can be controlled separately.
+  Future<int> getVolume();
+
   /// Add a slave player to this master's group.
   ///
   /// For BluOS: master calls AddSlave with slave IP.

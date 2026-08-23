@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/bluos_client.dart';
-import '../api/sonos_client.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/providers.dart';
@@ -92,84 +91,31 @@ class PlayersListView extends ConsumerStatefulWidget {
 }
 
 class _PlayersListViewState extends ConsumerState<PlayersListView> {
-  /// Group info: coordinator IP -> list of member IPs
-  Map<String, List<String>> _groupInfo = {};
-
   @override
   void initState() {
     super.initState();
     // Load group info after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshGroupInfo());
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => ref.read(groupProvider.notifier).refresh(force: true));
   }
 
-  Future<void> _refreshGroupInfo() async {
-    final playersState = ref.read(playersProvider);
-    final players = playersState.players;
-    if (players.isEmpty) return;
-
-    final merged = <String, List<String>>{};
-
-    // For Sonos: one query returns full topology
-    final sonosPlayer = players.where((p) => p.isSonos).firstOrNull;
-    if (sonosPlayer != null) {
-      try {
-        final client = SonosClient(sonosPlayer.ip);
-        final info = await client.getGroupInfo();
-        merged.addAll(info);
-      } catch (_) {}
-    }
-
-    // For BluOS: query each player's /SyncStatus individually
-    for (final player in players.where((p) => p.isBluOS)) {
-      try {
-        final client = BluOSClient(player.ip);
-        final info = await client.getGroupInfo();
-        for (final entry in info.entries) {
-          final existing = merged[entry.key];
-          if (existing != null) {
-            for (final ip in entry.value) {
-              if (!existing.contains(ip)) existing.add(ip);
-            }
-          } else {
-            merged[entry.key] = List.from(entry.value);
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (mounted) setState(() => _groupInfo = merged);
-  }
-
-  /// Get the group role for a player IP, or null if not grouped.
-  /// Returns 'coordinator' or 'member'.
-  String? _getGroupRole(PlayerInfo player) {
-    if (_groupInfo.containsKey(player.ip)) {
-      return 'coordinator';
-    }
-    for (final entry in _groupInfo.entries) {
-      if (entry.value.contains(player.ip)) {
-        return 'member';
-      }
-    }
-    return null;
-  }
+  Future<void> _refreshGroupInfo() =>
+      ref.read(groupProvider.notifier).refresh(force: true);
 
   /// Get the coordinator's name for a grouped player.
-  String? _getGroupCoordinatorName(PlayerInfo player, List<PlayerInfo> allPlayers) {
-    for (final entry in _groupInfo.entries) {
-      if (entry.value.contains(player.ip)) {
-        // Find coordinator name
-        final coord = allPlayers.where((p) => p.ip == entry.key);
-        if (coord.isNotEmpty) return coord.first.shortName;
-        return entry.key;
-      }
-    }
-    return null;
+  String? _getGroupCoordinatorName(
+      GroupState groupState, PlayerInfo player, List<PlayerInfo> allPlayers) {
+    if (groupState.roleOf(player.ip) != 'member') return null;
+    final coordIp = groupState.coordinatorOf(player.ip);
+    if (coordIp == null) return null;
+    final coord = allPlayers.where((p) => p.ip == coordIp);
+    return coord.isNotEmpty ? coord.first.shortName : coordIp;
   }
 
   /// Get member names for a coordinator.
-  List<String> _getGroupMemberNames(PlayerInfo player, List<PlayerInfo> allPlayers) {
-    final memberIps = _groupInfo[player.ip];
+  List<String> _getGroupMemberNames(
+      GroupState groupState, PlayerInfo player, List<PlayerInfo> allPlayers) {
+    final memberIps = groupState.groups[player.ip];
     if (memberIps == null) return [];
     return memberIps.map((ip) {
       final p = allPlayers.where((p) => p.ip == ip);
@@ -181,11 +127,7 @@ class _PlayersListViewState extends ConsumerState<PlayersListView> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final playersState = ref.watch(playersProvider);
-
-    // Refresh group info when status changes
-    ref.listen(statusProvider, (prev, next) {
-      if (prev?.status != next.status) _refreshGroupInfo();
-    });
+    final groupState = ref.watch(groupProvider);
 
     if (playersState.players.isEmpty && !playersState.isScanning) {
       return Center(
@@ -232,9 +174,11 @@ class _PlayersListViewState extends ConsumerState<PlayersListView> {
             itemBuilder: (context, index) {
               final player = playersState.players[index];
               final isSelected = player == selectedPlayer;
-              final groupRole = _getGroupRole(player);
-              final memberNames = _getGroupMemberNames(player, playersState.players);
-              final coordName = _getGroupCoordinatorName(player, playersState.players);
+              final groupRole = groupState.roleOf(player.ip);
+              final memberNames =
+                  _getGroupMemberNames(groupState, player, playersState.players);
+              final coordName = _getGroupCoordinatorName(
+                  groupState, player, playersState.players);
 
               // Build subtitle with group info
               String? groupSubtitle;

@@ -676,6 +676,22 @@ class SonosClient implements AudioClient {
   }
 
   @override
+  Future<int> getVolume() async {
+    // RenderingControl is per-device, so this is always the player's own volume.
+    try {
+      final xml = await _soap(
+        '/MediaRenderer/RenderingControl/Control',
+        'RenderingControl',
+        'GetVolume',
+        '<InstanceID>0</InstanceID><Channel>Master</Channel>',
+      );
+      final value = int.tryParse(_extractFromSoap(xml, 'CurrentVolume'));
+      if (value != null && value >= 0) return value;
+    } catch (_) {}
+    return -1;
+  }
+
+  @override
   Future<void> addSlave(String slaveIP, {String? slaveUuid, String? masterUuid}) async {
     if (masterUuid == null || masterUuid.isEmpty) {
       throw const AudioClientException(

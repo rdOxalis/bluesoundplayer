@@ -58,6 +58,7 @@ class AppLocalizations {
       'volume': 'Volume',
       'volumeNA': 'N/A',
       'failedToSetVolume': 'Failed to set volume',
+      'groupVolume': 'Group volume',
 
       // Settings
       'language': 'Language',
@@ -151,6 +152,7 @@ class AppLocalizations {
       'volume': 'Lautstärke',
       'volumeNA': 'N/V',
       'failedToSetVolume': 'Lautstärke konnte nicht eingestellt werden',
+      'groupVolume': 'Gruppenlautstärke',
 
       // Settings
       'language': 'Sprache',
@@ -244,6 +246,7 @@ class AppLocalizations {
       'volume': 'Sauti',
       'volumeNA': 'Haipo',
       'failedToSetVolume': 'Imeshindwa kuweka sauti',
+      'groupVolume': 'Sauti ya kikundi',
 
       // Settings
       'language': 'Lugha',
@@ -344,6 +347,7 @@ class AppLocalizations {
   String get volume => get('volume');
   String get volumeNA => get('volumeNA');
   String get failedToSetVolume => get('failedToSetVolume');
+  String get groupVolume => get('groupVolume');
 
   // Settings
   String get language => get('language');

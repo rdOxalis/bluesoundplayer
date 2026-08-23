@@ -89,21 +89,14 @@ class BluOSClient implements AudioClient {
     String album = title3;
     if (album.isEmpty) album = getText('album');
 
-    // Volume: if individual volume is -1 (e.g. grouped player), try groupVolume
+    // Volume: for a grouped slave, /Status is a copy of the MASTER's status,
+    // so <volume> (and <groupVolume>) would report the master's level.
+    // Read this player's own volume from /Volume instead.
     int volume = getInt('volume', -1);
-    if (volume < 0) {
-      volume = getInt('groupVolume', -1);
-    }
-    // If still -1, try fetching volume directly
-    if (volume < 0) {
-      try {
-        final volXml = await _get('/Volume');
-        final volDoc = XmlDocument.parse(volXml);
-        final volEl = volDoc.findAllElements('volume').firstOrNull;
-        if (volEl != null) {
-          volume = int.tryParse(volEl.innerText) ?? -1;
-        }
-      } catch (_) {}
+    final isGrouped = getText('groupName').isNotEmpty;
+    if (isGrouped || volume < 0) {
+      final ownVolume = await getVolume();
+      if (ownVolume >= 0) volume = ownVolume;
     }
 
     // If no track info and player might be a grouped slave, fetch master's status
@@ -229,6 +222,19 @@ class BluOSClient implements AudioClient {
       throw ArgumentError('Volume must be between 0 and 100');
     }
     await _get('/Volume?level=$level');
+  }
+
+  @override
+  Future<int> getVolume() async {
+    // /Volume returns <volume db="-20.0">45</volume> for this player only.
+    try {
+      final xml = await _get('/Volume');
+      final document = XmlDocument.parse(xml);
+      final volEl = document.findAllElements('volume').firstOrNull;
+      final value = int.tryParse(volEl?.innerText.trim() ?? '');
+      if (value != null && value >= 0) return value;
+    } catch (_) {}
+    return -1;
   }
 
   @override
