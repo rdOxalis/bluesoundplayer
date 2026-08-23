@@ -1,0 +1,1 @@
+Lautstärke gruppierter Player: pro Player ein eigener Regler, der wirklich nur dieses Gerät steuert. Behebt außerdem, dass ein BluOS-Slave die Lautstärke des Masters anzeigte, und macht die Regler flüssig.

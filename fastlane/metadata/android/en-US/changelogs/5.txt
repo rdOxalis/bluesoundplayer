@@ -1,0 +1,1 @@
+Volume for grouped players: one slider per player, each controlling only that device. Also fixes a BluOS slave showing the master volume, and makes the sliders respond smoothly while dragging.
